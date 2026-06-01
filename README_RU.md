@@ -1,3 +1,5 @@
+Язык: [English](README.md) | Русский
+
 # SoundCloud Random Music
 
 **SoundCloud Random Music** — небольшой терминальный плеер для SoundCloud.
