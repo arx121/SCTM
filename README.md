@@ -1,3 +1,5 @@
+Language: English | [Русский](README.ru.md)
+
 # SoundCloud Random Music
 
 **SoundCloud Random Music** is a small terminal player for SoundCloud.
