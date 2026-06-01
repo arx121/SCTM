@@ -1,4 +1,4 @@
-Language: English | [Русский](README.ru.md)
+Language: English | [Русский](README_RU.md)
 
 # SoundCloud Random Music
 
