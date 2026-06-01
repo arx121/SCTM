@@ -1,88 +1,56 @@
 # SoundCloud Random Music
 
-**SoundCloud Random Music** — маленький терминальный плеер для SoundCloud.
+**SoundCloud Random Music** is a small terminal player for SoundCloud.
 
-Он берёт публичные лайки или плейлисты SoundCloud, выбирает случайный трек и запускает его через `mpv`.
-Проект сделан в первую очередь под Windows и запускается одной кнопкой через `start.bat`.
-
-Главная идея простая:
-**открыл папку → нажал `start.bat` → играет случайная музыка из SoundCloud.**
-
----
-
-## Что умеет
-
-* запускать случайный трек из SoundCloud likes;
-* работать с публичными плейлистами;
-* поддерживать несколько источников сразу;
-* переключать треки;
-* возвращаться на предыдущий трек;
-* ставить паузу;
-* включать/выключать повтор;
-* менять громкость;
-* показывать прогресс трека;
-* показывать оставшееся время;
-* вести статистику прослушивания;
-* запоминать уже прослушанные треки;
-* добавлять нерабочие треки в чёрный список;
-* заранее подгружать следующий трек;
-* хранить настройки внутри папки программы.
-
----
-
-## Как выглядит управление
-
-Во время музыки внизу появляется меню:
+It plays random tracks from public SoundCloud likes or playlists.
+The Windows version is portable and starts with one file:
 
 ```txt
-Играет 0:42/2:30 -1:48 [###-------] | [Дальше] Назад Пауза Повт:выкл Звук:80% Меню | S:3
+start.bat
 ```
 
-Управление:
+The idea is simple:
 
 ```txt
-Стрелки влево/вправо — выбрать пункт
-Enter — нажать выбранный пункт
+open folder -> run start.bat -> random SoundCloud music starts
 ```
 
 ---
 
-## Структура папки
+## Features
 
-Проект сделан максимально просто:
-
-```txt
-soundcloud-random-music-windows
-├─ start.bat
-└─ main
-```
-
-`start.bat` — главный файл запуска.
-`main` — сама программа и её данные.
-
-Настройки и история хранятся внутри:
-
-```txt
-main/data
-```
+* random playback from SoundCloud likes;
+* random playback from public SoundCloud playlists;
+* support for multiple sources;
+* next / previous track;
+* pause and resume;
+* repeat mode;
+* volume control;
+* progress bar;
+* remaining time;
+* listening statistics;
+* blacklist for broken tracks;
+* played history;
+* next track preloading;
+* portable settings inside the project folder.
 
 ---
 
-## Требования
+## Requirements
 
-Перед запуском нужно установить:
+Before running the program, install these dependencies.
 
-### Node.js
+### 1. Node.js
 
-Нужен для работы программы.
+Required to run the program.
 
-Скачать можно с официального сайта:
+Download:
 
 ```txt
 https://nodejs.org/
 ```
 
-Проверка:
+Check installation:
 
 ```powershell
 node --version
@@ -91,23 +59,23 @@ npm --version
 
 ---
 
-### mpv
+### 2. mpv
 
-Нужен для проигрывания музыки.
+Required to play audio.
 
-Установка через PowerShell:
+Install with PowerShell:
 
 ```powershell
 winget install -e --id shinchiro.mpv --source winget
 ```
 
-Проверка:
+Check installation:
 
 ```powershell
 mpv --version
 ```
 
-Если Windows не видит `mpv`, обычно он лежит здесь:
+If Windows cannot find `mpv`, it is usually installed here:
 
 ```txt
 C:\Program Files\MPV Player\mpv.com
@@ -115,17 +83,17 @@ C:\Program Files\MPV Player\mpv.com
 
 ---
 
-### yt-dlp
+### 3. yt-dlp
 
-Нужен как запасной способ получения аудио из SoundCloud.
+Used as a fallback method for getting audio from SoundCloud.
 
-Установка:
+Install with PowerShell:
 
 ```powershell
 winget install -e --id yt-dlp.yt-dlp --source winget
 ```
 
-Проверка:
+Check installation:
 
 ```powershell
 yt-dlp --version
@@ -133,76 +101,85 @@ yt-dlp --version
 
 ---
 
-## Запуск
+## How to Run
 
-1. Скачать архив.
-2. Распаковать папку.
-3. Открыть папку `soundcloud-random-music-windows`.
-4. Запустить:
+1. Download the project.
+2. Extract the folder.
+3. Open the folder:
+
+```txt
+soundcloud-random-music-windows
+```
+
+4. Run:
 
 ```txt
 start.bat
 ```
 
-При первом запуске программа сама установит npm-зависимости.
+On the first launch, the program will install npm dependencies automatically.
 
 ---
 
-## Как добавить источник
-
-В меню выбери:
+## Folder Structure
 
 ```txt
-Добавить источник
+soundcloud-random-music-windows
+├─ start.bat
+└─ main
 ```
 
-Можно добавить ссылку на лайки:
-
-```txt
-https://soundcloud.com/arx121/likes
-```
-
-или на плейлист:
-
-```txt
-https://soundcloud.com/arx121/sets/playlist-name
-```
-
----
-
-## Что хранится в data
-
-В папке:
+User data is stored here:
 
 ```txt
 main/data
 ```
 
-хранятся:
+This folder contains:
 
 ```txt
 config.json
 state.json
 ```
 
-Там лежат:
+---
 
-* добавленные источники;
-* громкость;
-* настройки получения аудио;
-* история;
-* список прослушанных треков;
-* чёрный список;
-* статистика.
+## How to Add Likes or Playlists
+
+Open the program and choose:
+
+```txt
+Add source
+```
+
+Then enter a name for the source and paste a SoundCloud link.
+
+### Public likes example
+
+```txt
+https://soundcloud.com/username/likes
+```
+
+### Public playlist example
+
+```txt
+https://soundcloud.com/username/sets/playlist-name
+```
+
+You can add several sources.
+The program can randomly choose tracks from all enabled sources.
 
 ---
 
-## Важное ограничение
+## Recommended Settings
 
-SoundCloud иногда не отдаёт некоторые треки обычным способом.
-Бывает так, что трек открывается в браузере, но не запускается через терминал.
+The recommended audio method is:
 
-Программа пытается обойти это несколькими способами:
+```txt
+smart
+```
+
+It tries several ways to get playable audio:
 
 ```txt
 SoundCloud stream API
@@ -210,136 +187,75 @@ yt-dlp
 yt-dlp + cookies
 ```
 
-Если трек всё равно не работает, он добавляется в чёрный список, и программа берёт следующий.
+If one method fails, the program tries another one.
 
 ---
 
-## Рекомендуемые настройки
+## Controls
 
-Обычно лучше оставить метод:
+During playback, the bottom line looks like this:
 
 ```txt
-smart
+Playing 0:42/2:30 -1:48 [###-------] | [Next] Back Pause Repeat:off Volume:80% Menu | S:3
 ```
 
-Он сам пробует несколько способов получения аудио.
+Controls:
+
+```txt
+Left / Right arrows - select action
+Enter - confirm selected action
+```
+
+Available actions:
+
+```txt
+Next
+Back
+Pause
+Repeat
+Volume
+Menu
+```
 
 ---
 
-## Команды
+## Useful Commands
 
-Статистика:
+Show statistics:
 
 ```powershell
 srm --stats
 ```
 
-Показать настройки:
+Show current config:
 
 ```powershell
 srm --show-config
 ```
 
-Очистить прослушанные:
+Clear played tracks:
 
 ```powershell
 srm --clear-played
 ```
 
-Очистить чёрный список:
+Clear blacklist:
 
 ```powershell
 srm --clear-blacklist
 ```
 
----
-
-## GitHub About
-
-```txt
-Random SoundCloud music player for public likes and playlists. Works through terminal with mpv, yt-dlp fallback, queue, stats, volume control and portable data.
-```
-
----
-
-## Topics
-
-```txt
-soundcloud
-music-player
-terminal
-cli
-mpv
-yt-dlp
-nodejs
-windows
-powershell
-random-music
-playlist
-portable
-```
-
----
-
-## .gitignore
-
-```gitignore
-node_modules/
-npm-debug.log*
-.DS_Store
-
-main/data/config.json
-main/data/state.json
-main/data/cache/
-main/data/temp/
-
-.env
-```
-
-Если хочешь оставить пустую папку `data` в репозитории, добавь туда файл:
-
-```txt
-.gitkeep
-```
-
----
-
-## Название релиза
-
-```txt
-SoundCloud Random Music Windows
-```
-
-## Описание релиза
-
-```txt
-Portable Windows version of SoundCloud Random Music.
-
-Features:
-- random playback from SoundCloud likes and playlists
-- mpv playback
-- yt-dlp fallback
-- smart audio resolving
-- previous/current/next queue
-- next track preload
-- volume control
-- pause and repeat
-- blacklist for broken tracks
-- played history
-- session stats
-- portable data inside main/data
-```
-
----
-
-## Загрузка на GitHub
+Set audio method:
 
 ```powershell
-cd "D:\dowloadW\soundcloud-random-music-windows"
-git init
-git add .
-git commit -m "Initial release"
-git branch -M main
-git remote add origin https://github.com/arx121/soundcloud-random-music.git
-git push -u origin main
+srm --method smart
 ```
+
+---
+
+## Notes
+
+SoundCloud does not always provide every track in a terminal-friendly way.
+
+Sometimes a track may work in the browser but fail in the terminal.
+If a track cannot be played, the program adds it to the blacklist and chooses another one.
