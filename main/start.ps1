@@ -2,8 +2,12 @@
 $ErrorActionPreference = "Stop"
 
 function Pause-And-Exit([int]$Code = 0) {
+  if ($Code -eq 0) {
+    exit 0
+  }
+
   Write-Host ""
-  Read-Host "Нажми Enter для закрытия окна"
+  Read-Host "Press Enter to close this window"
   exit $Code
 }
 
@@ -118,13 +122,15 @@ try {
     Write-Host ""
   }
 
-  Write-Host "Версия:" -ForegroundColor DarkGray
+  Write-Host "Version:" -ForegroundColor DarkGray
   & node .\src\index.mjs --version
   Write-Host ""
-  Write-Host "Запускаю..." -ForegroundColor Green
+  Write-Host "Starting..." -ForegroundColor Green
   Write-Host ""
   & node .\src\index.mjs
-  Pause-And-Exit 0
+  $exitCode = $LASTEXITCODE
+  if ($null -eq $exitCode) { $exitCode = 0 }
+  Pause-And-Exit $exitCode
 } catch {
   Write-Host ""
   Write-Host "Ошибка запуска:" -ForegroundColor Red

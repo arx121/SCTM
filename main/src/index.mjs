@@ -10,7 +10,7 @@ import { homedir, tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { createConnection } from "node:net";
 
-const VERSION = "2.26.1-windows";
+const VERSION = "2.30.1-windows";
 const API_BASE = "https://api-v2.soundcloud.com";
 const LEGACY_CONFIG_DIR = join(homedir(), ".soundcloud-random-music");
 
@@ -38,27 +38,31 @@ const DEFAULT_CONFIG = {
     retries: 3,
     timeoutMs: 15000,
     proxyUrl: "",
-    streamRetries: 3,
-    trackDelayMs: 1400,
+    streamRetries: 1,
+    trackDelayMs: 200,
     validateStream: true,
-    fallbackToPermalink: true,
-    startupTimeoutMs: 9000,
+    fallbackToPermalink: false,
+    startupTimeoutMs: 6500,
     openBrowserOnPlaybackFail: false
   },
   controls: {
     inputMode: "auto",
     cleanConsole: true
   },
+  ui: {
+    language: "en"
+  },
   browserPlayer: {
     enabled: false,
     backend: "mpv",
     browser: "auto",
     hideWindow: true,
-    cookieBrowser: "auto"
+    cookieBrowser: "off"
   },
   playback: {
     method: "smart",
     mode: "auto",
+    tempDownloadFallback: false,
     volume: 80
   },
   preload: {
@@ -83,6 +87,231 @@ const DEMO_TRACKS = [
   { id: "demo3", title: "Rain Window", user: { username: "Demo" }, permalink_url: "https://soundcloud.com/demo/rain-window" },
   { id: "demo4", title: "Warm Keys", user: { username: "Demo" }, permalink_url: "https://soundcloud.com/demo/warm-keys" }
 ];
+
+
+const I18N = {
+  ru: {
+    menuHelp: "Стрелки вверх/вниз = выбор, Enter = открыть, q/Esc = выход/назад",
+    mainPlay: "Запустить рандом",
+    mainAdd: "Добавить источник",
+    mainList: "Показать источники",
+    mainStats: "Статистика",
+    mainSettings: "Настройки",
+    mainClearPlayed: "Очистить прослушанные",
+    mainClearBlacklist: "Очистить чёрный список",
+    mainExit: "Выход",
+    settingsTitle: "Настройки",
+    settingsBackend: "Backend",
+    settingsBrowser: "Cookies",
+    settingsMethod: "Метод получения",
+    settingsPlayback: "Воспроизведение",
+    settingsInput: "Ввод",
+    settingsProxy: "Прокси",
+    settingsLanguage: "Язык",
+    back: "Назад",
+    langTitle: "Язык интерфейса",
+    backendTitle: "Backend",
+    backendLine1: "mpv быстрый режим через терминал",
+    backendLine2: "Браузерный backend удалён: он открывал вкладки и не давал честно понять, играет ли звук.",
+    pressEnterBack: "Нажми Enter, чтобы вернуться.",
+    browserTitle: "Cookies disabled",
+    methodTitle: "Метод получения музыки",
+    playbackTitle: "Метод воспроизведения",
+    playbackStream: "stream через mpv",
+    playbackDownload: "скачать во временный файл и играть",
+    inputTitle: "Настройки ввода",
+    proxyTitle: "Настройки прокси",
+    currentProxy: "Текущий прокси",
+    setProxy: "Указать прокси",
+    clearProxy: "Отключить прокси",
+    proxyPrompt: "Прокси URL, например http://127.0.0.1:7890",
+    sourceName: "Имя источника",
+    sourceUrl: "Ссылка SoundCloud /likes или /sets/...",
+    added: "Добавлено",
+    pressEnterMenu: "Нажми Enter, чтобы вернуться в меню.",
+    playedCleared: "Прослушанные очищены.",
+    blacklistCleared: "Чёрный список очищен.",
+    fileSettings: "Файл настроек",
+    mode: "Режим",
+    searchingClient: "Ищу публичный ключ SoundCloud web app...",
+    source: "Источник",
+    profileFound: "Профиль найден",
+    tracksFromSource: "Треков из источника",
+    totalTracks: "Всего треков из источников",
+    blacklist: "В чёрном списке",
+    played: "Уже прослушано",
+    available: "Доступно для рандома сейчас",
+    randomTrack: "Случайный трек",
+    nextFromHistory: "Следующий из истории",
+    previousAvailable: "Назад доступно",
+    buttonBack: "кнопка Назад",
+    gettingAudio: "Получаю аудио",
+    resolving: "получение",
+    playback: "воспроизведение",
+    methodApi: "Метод: SoundCloud stream API",
+    methodYtdlp: "Метод: yt-dlp",
+    methodYtdlpCookies: "Метод: yt-dlp + cookies (disabled)",
+    player: "Плеер",
+    checkingTrack: "Проверяю трек...",
+    waitingSound: "Жду реального старта звука...",
+    trackNotStarted: "Трек не начал играть, пробую другой способ...",
+    nowPlaying: "Сейчас играет",
+    trackStarted: "Трек запущен",
+    inputLineMode: "Режим ввода: команды с Enter. Напиши n / b / p / q и нажми Enter.",
+    playing: "Играет",
+    paused: "Пауза",
+    next: "Дальше",
+    prev: "Назад",
+    pause: "Пауза",
+    resume: "Играть",
+    repeat: "Повтор",
+    repeatShort: "Повт",
+    volume: "Звук",
+    menu: "Меню",
+    on: "вкл",
+    off: "выкл",
+    session: "Сессия",
+    tracks: "треков",
+    cacheAudio: "Беру аудио из кэша прошлой/текущей/следующей песни...",
+    preloadWaiting: "Следующая песня уже загружается, жду готовый аудио-поток...",
+    preloadFailed: "Предзагрузка не помогла, получаю аудио заново...",
+    playbackFailed: "Трек не заиграл в терминале, добавляю в чёрный список и беру следующий. Браузер больше не открываю.",
+    noPrevious: "Назад пока нельзя: предыдущей песни ещё нет.",
+    shortWarn1: "Внимание: два трека подряд длились 30 секунд или меньше.",
+    shortWarn2: "Похоже, SoundCloud/mpv мог отдать короткие preview-потоки.",
+    shortWarn3: "Лучше перезапусти SRM через start.bat, чтобы обновить сессию и ключи.",
+    shortWarn4: "Если эти треки реально короткие, просто запусти рандом снова.",
+    statsTitle: "SoundCloud Random Music — статистика",
+    file: "Файл",
+    historyTotal: "Всего прослушиваний в истории",
+    totalTime: "Всего времени",
+    last7: "За 7 дней",
+    last30: "За 30 дней",
+    topArtists: "Топ артистов",
+    noHistory: "Пока нет истории. Запусти пару треков через srm.",
+    hours: "ч"
+  },
+  en: {
+    menuHelp: "Up/Down arrows = select, Enter = open, q/Esc = exit/back",
+    mainPlay: "Start random",
+    mainAdd: "Add source",
+    mainList: "Show sources",
+    mainStats: "Statistics",
+    mainSettings: "Settings",
+    mainClearPlayed: "Clear played tracks",
+    mainClearBlacklist: "Clear blacklist",
+    mainExit: "Exit",
+    settingsTitle: "Settings",
+    settingsBackend: "Backend",
+    settingsBrowser: "Cookies",
+    settingsMethod: "Audio method",
+    settingsPlayback: "Playback",
+    settingsInput: "Input",
+    settingsProxy: "Proxy",
+    settingsLanguage: "Language",
+    back: "Back",
+    langTitle: "Interface language",
+    backendTitle: "Backend",
+    backendLine1: "mpv fast terminal mode",
+    backendLine2: "Browser backend was removed because it opened tabs and could not reliably detect real playback.",
+    pressEnterBack: "Press Enter to go back.",
+    browserTitle: "Cookies disabled",
+    methodTitle: "Audio resolving method",
+    playbackTitle: "Playback method",
+    playbackStream: "stream through mpv",
+    playbackDownload: "download to temporary file and play",
+    inputTitle: "Input settings",
+    proxyTitle: "Proxy settings",
+    currentProxy: "Current proxy",
+    setProxy: "Set proxy",
+    clearProxy: "Disable proxy",
+    proxyPrompt: "Proxy URL, for example http://127.0.0.1:7890",
+    sourceName: "Source name",
+    sourceUrl: "SoundCloud /likes or /sets/... URL",
+    added: "Added",
+    pressEnterMenu: "Press Enter to return to the menu.",
+    playedCleared: "Played tracks cleared.",
+    blacklistCleared: "Blacklist cleared.",
+    fileSettings: "Config file",
+    mode: "Mode",
+    searchingClient: "Looking for public SoundCloud web app key...",
+    source: "Source",
+    profileFound: "Profile found",
+    tracksFromSource: "Tracks from source",
+    totalTracks: "Total tracks from sources",
+    blacklist: "In blacklist",
+    played: "Already played",
+    available: "Available for random now",
+    randomTrack: "Random track",
+    nextFromHistory: "Next from history",
+    previousAvailable: "Back available",
+    buttonBack: "Back button",
+    gettingAudio: "Getting audio",
+    resolving: "resolving",
+    playback: "playback",
+    methodApi: "Method: SoundCloud stream API",
+    methodYtdlp: "Method: yt-dlp",
+    methodYtdlpCookies: "Method: yt-dlp + cookies (disabled)",
+    player: "Player",
+    checkingTrack: "Checking track...",
+    waitingSound: "Waiting for real audio start...",
+    trackNotStarted: "Track did not start, trying another method...",
+    nowPlaying: "Now playing",
+    trackStarted: "Track started",
+    inputLineMode: "Input mode: commands with Enter. Type n / b / p / q and press Enter.",
+    playing: "Playing",
+    paused: "Paused",
+    next: "Next",
+    prev: "Back",
+    pause: "Pause",
+    resume: "Play",
+    repeat: "Repeat",
+    repeatShort: "Repeat",
+    volume: "Volume",
+    menu: "Menu",
+    on: "on",
+    off: "off",
+    session: "Session",
+    tracks: "tracks",
+    cacheAudio: "Using cached audio for previous/current/next track...",
+    preloadWaiting: "Next track is already preloading, waiting for prepared audio...",
+    preloadFailed: "Preload failed, resolving audio again...",
+    playbackFailed: "Track did not play in terminal, adding it to blacklist and picking another one. Browser will not open.",
+    noPrevious: "Cannot go back yet: there is no previous track.",
+    shortWarn1: "Warning: two tracks in a row lasted 30 seconds or less.",
+    shortWarn2: "SoundCloud/mpv may have returned short preview streams.",
+    shortWarn3: "Restart SRM through start.bat to refresh the session and keys.",
+    shortWarn4: "If these tracks are really short, just start random again.",
+    statsTitle: "SoundCloud Random Music — statistics",
+    file: "File",
+    historyTotal: "Total plays in history",
+    totalTime: "Total time",
+    last7: "Last 7 days",
+    last30: "Last 30 days",
+    topArtists: "Top artists",
+    noHistory: "No history yet. Play a few tracks with srm.",
+    hours: "h"
+  }
+};
+
+function langOf(config = null) {
+  const raw = String(valueOf("--language") || valueOf("--lang") || config?.ui?.language || "en").toLowerCase().trim();
+  return raw === "en" || raw === "english" ? "en" : "ru";
+}
+
+function t(config, key) {
+  const lang = langOf(config);
+  return I18N[lang]?.[key] || I18N.ru[key] || key;
+}
+
+function appLanguage() {
+  try { return langOf(loadConfig()); } catch { return "en"; }
+}
+
+function tt(key) {
+  const lang = appLanguage();
+  return I18N[lang]?.[key] || I18N.ru[key] || key;
+}
 
 
 const USE_COLOR = process.stdout.isTTY && !process.env.NO_COLOR;
@@ -121,7 +350,7 @@ function artworkUrl(track) {
 function printArtwork(track) {
   const url = artworkUrl(track);
   if (!url) return;
-  console.log(`${color.cyan("Обложка:")} ${url}`);
+  console.log(`${color.cyan(appLanguage() === "en" ? "Artwork:" : "Обложка:")} ${url}`);
 }
 
 function artistName(trackOrEntry) {
@@ -145,7 +374,7 @@ function parseArgs(args) {
     if (arg.startsWith("--")) {
       const [name, inlineValue] = arg.split("=", 2);
       flags.add(name);
-      const wantsValue = ["--player", "--add", "--remove", "--default", "--proxy", "--browser-player", "--backend", "--input", "--cookies-browser", "--method", "--playback"].includes(name);
+      const wantsValue = ["--player", "--add", "--remove", "--default", "--proxy", "--browser-player", "--backend", "--input", "--cookies-browser", "--method", "--playback", "--language", "--lang"].includes(name);
       if (inlineValue !== undefined) {
         values.set(name, inlineValue);
       } else if (wantsValue && args[i + 1] && !args[i + 1].startsWith("--")) {
@@ -170,60 +399,94 @@ function hasFlag(name) { return parsed.flags.has(name); }
 function valueOf(name) { return parsed.values.get(name); }
 
 function showHelp() {
+  const en = appLanguage() === "en";
+  if (en) {
+    console.log(`
+SoundCloud Random Music v${VERSION}
+
+Basic:
+  srm                         Play random from defaultSource in config.json
+  srm <url>                   Play random from a specific SoundCloud URL
+  srm --loop                  Keep playing random tracks
+  srm --no-play               Only print selected track
+  srm --open                  Open selected track in browser
+
+Playback controls:
+  Left / Right arrows          Select action
+  Enter                        Confirm selected action
+  n                            Next track
+  b                            Back to previous track
+  p / Space                    Pause / resume
+  r                            Repeat on/off
+  q / Esc                      Exit
+
+Settings:
+  srm --init-config            Create config.json
+  srm --config-path            Show config.json path
+  srm --show-config            Show config.json
+  srm --list                   Show sources
+  srm --stats                  Listening statistics
+  srm --clear-played           Clear played tracks
+  srm --clear-blacklist        Clear blacklist
+  srm --add likes <url>        Add likes/playlist source
+  srm --remove likes           Remove source
+  srm --default all            Use all sources by default
+  srm --player mpv             Save player: auto, mpv, ffplay, vlc
+  srm --language en            Set interface language: en/ru
+  srm --method smart           Set audio resolving method (no cookies)
+  srm --playback auto          Set playback mode
+  srm --input line             Commands are typed as n + Enter
+  srm --input raw              Hotkeys without Enter
+
+Example:
+  srm --add likes https://soundcloud.com/arx_1/likes
+  srm --language en
+  srm
+`);
+    return;
+  }
+
   console.log(`
 SoundCloud Random Music v${VERSION}
 
 Основное:
   srm                         Играть рандом из defaultSource в config.json
   srm <url>                   Играть рандом из конкретной ссылки SoundCloud
-  srm --loop                  Бесконечный рандом: после трека включает следующий
+  srm --loop                  Бесконечный рандом
   srm --no-play               Только вывести выбранный трек
   srm --open                  Открыть выбранный трек в браузере
 
 Управление во время музыки:
-  n / т / д / Enter           Следующий случайный трек
+  Стрелки влево/вправо        Выбрать действие
+  Enter                       Подтвердить действие
+  n / т / д                   Следующий трек
   b / и                       Назад к прошлому треку
-  q / й                       Выход
   p / з / Space               Пауза / продолжить
-  r / к                       Включить/выключить повтор текущего трека
-  Ctrl+C                      Выход
+  r / к                       Включить/выключить повтор
+  q / й / Esc                 Выход
 
 Настройки:
   srm --init-config           Создать config.json
   srm --config-path           Показать путь к config.json
   srm --show-config           Показать config.json
   srm --list                  Показать источники
-  srm --stats                 Статистика: часы, 7/30 дней, топ артистов
-  srm --show-state            Показать blacklist/played/history state.json
-  srm --clear-played          Очистить список прослушанных треков
-  srm --clear-blacklist       Очистить чёрный список недоступных треков
+  srm --stats                 Статистика
+  srm --clear-played          Очистить прослушанные
+  srm --clear-blacklist       Очистить чёрный список
   srm --add likes <url>       Добавить лайки/плейлист
   srm --remove likes          Удалить источник
-  srm --default all           Рандом из всех источников по умолчанию
-  srm --default likes         Сделать конкретный источник дефолтным
-  srm --player mpv            Сохранить плеер: auto, mpv, ffplay, vlc
-  srm --proxy <url>           Сохранить прокси только для srm
-  srm --clear-proxy           Убрать прокси
-  srm --diagnose              Проверить доступ к SoundCloud
-  srm --backend mpv          Быстрый режим через mpv
-  srm --browser-player off   Браузерный плеер отключён
-  srm --cookies-browser auto Авто cookies из браузера для mpv/yt-dlp
-  srm --cookies-browser safari/chrome/edge/off
-  srm --method smart/auto/soundcloud-api-first/yt-dlp-first/yt-dlp-cookies-first
-  srm --playback auto/stream/download-temp
-  srm --safe-mode             Рекомендуемый режим: smart + auto temp download
-  srm --input line           Команды вводятся как n + Enter, p + Enter
-  srm --input raw            Горячие клавиши без Enter
-  srm --reset-client-id       Заново найти публичный ключ SoundCloud
-
-Прокси:
-  Поддерживается HTTP/HTTPS/SOCKS proxy через undici ProxyAgent.
-  Пример: srm --proxy http://127.0.0.1:7890
+  srm --default all           Рандом из всех источников
+  srm --player mpv            Сохранить плеер
+  srm --language ru           Язык интерфейса: ru/en
+  srm --method smart          Метод получения аудио без cookies
+  srm --playback auto         Режим воспроизведения
+  srm --input line            Команды как n + Enter
+  srm --input raw             Горячие клавиши без Enter
 
 Пример:
   srm --add likes https://soundcloud.com/arx_1/likes
-  srm --player mpv
-  srm --loop
+  srm --language en
+  srm
 `);
 }
 
@@ -261,6 +524,7 @@ function loadConfig() {
       network: { ...DEFAULT_CONFIG.network, ...(loaded.network || {}) },
       cache: { ...DEFAULT_CONFIG.cache, ...(loaded.cache || {}) },
       controls: { ...DEFAULT_CONFIG.controls, ...(loaded.controls || {}) },
+      ui: { ...DEFAULT_CONFIG.ui, ...(loaded.ui || {}) },
       browserPlayer: { ...DEFAULT_CONFIG.browserPlayer, ...(loaded.browserPlayer || {}) },
       playback: { ...DEFAULT_CONFIG.playback, ...(loaded.playback || {}) },
       sources: Array.isArray(loaded.sources) ? loaded.sources : []
@@ -270,7 +534,22 @@ function loadConfig() {
     if (merged.browserPlayer?.backend === "browser" || merged.browserPlayer?.enabled === true) {
       merged.browserPlayer = { ...merged.browserPlayer, backend: "mpv", enabled: false };
     }
-    merged.network = { ...merged.network, openBrowserOnPlaybackFail: false };
+    // Windows fast profile: do not spend 30+ seconds on tracks that mpv cannot start.
+    // If a track fails the quick SoundCloud/mpv check, skip it and preload another one.
+    merged.network = {
+      ...merged.network,
+      openBrowserOnPlaybackFail: false,
+      fallbackToPermalink: false,
+      retries: Math.min(2, Math.max(1, Number(merged.network?.retries || 2))),
+      timeoutMs: Math.min(7000, Math.max(3000, Number(merged.network?.timeoutMs || 6000))),
+      streamRetries: Math.min(1, Math.max(1, Number(merged.network?.streamRetries || 1))),
+      trackDelayMs: Math.min(300, Math.max(0, Number(merged.network?.trackDelayMs || 200))),
+      startupTimeoutMs: Math.min(8000, Math.max(4000, Number(merged.network?.startupTimeoutMs || 6500)))
+    };
+    merged.playback = {
+      ...merged.playback,
+      tempDownloadFallback: false
+    };
     return merged;
   } catch (error) {
     throw new Error(`Не могу прочитать config.json: ${error.message}`);
@@ -386,21 +665,21 @@ function printStats() {
   const month = statsForHistory(history, 30);
   const hours = (seconds) => (Math.max(0, Number(seconds) || 0) / 3600).toFixed(2);
 
-  console.log(color.bold("SoundCloud Random Music — статистика"));
-  console.log(`Файл: ${STATE_PATH}`);
+  console.log(color.bold(tt("statsTitle")));
+  console.log(`${tt("file")}: ${STATE_PATH}`);
   console.log("");
-  console.log(`Всего прослушиваний в истории: ${all.count}`);
-  console.log(`Всего времени: ${hours(all.totalSeconds)} ч (${formatTime(all.totalSeconds)})`);
-  console.log(`За 7 дней: ${week.count} треков, ${hours(week.totalSeconds)} ч`);
-  console.log(`За 30 дней: ${month.count} треков, ${hours(month.totalSeconds)} ч`);
+  console.log(`${tt("historyTotal")}: ${all.count}`);
+  console.log(`${tt("totalTime")}: ${hours(all.totalSeconds)} ${tt("hours")} (${formatTime(all.totalSeconds)})`);
+  console.log(`${tt("last7")}: ${week.count} ${tt("tracks")}, ${hours(week.totalSeconds)} ${tt("hours")}`);
+  console.log(`${tt("last30")}: ${month.count} ${tt("tracks")}, ${hours(month.totalSeconds)} ${tt("hours")}`);
   console.log(`Played: ${(state.played || []).length}`);
   console.log(`Blacklist: ${(state.blacklist || []).length}`);
   console.log("");
-  console.log(color.bold("Топ артистов:"));
+  console.log(color.bold(`${tt("topArtists")}:`));
   const top = all.topArtists.length ? all.topArtists : [];
-  if (top.length === 0) console.log("Пока нет истории. Запусти пару треков через srm.");
+  if (top.length === 0) console.log(tt("noHistory"));
   top.forEach((item, index) => {
-    console.log(`${index + 1}. ${item.artist} — ${item.plays} треков, ${hours(item.seconds)} ч`);
+    console.log(`${index + 1}. ${item.artist} — ${item.plays} ${tt("tracks")}, ${hours(item.seconds)} ${tt("hours")}`);
   });
 }
 
@@ -488,13 +767,17 @@ async function fetchWithRetry(url, options = {}) {
       clearTimeout(timer);
       lastError = error;
       if (attempt < retries) {
-        console.log(`Сеть не ответила, пробую ещё раз ${attempt}/${retries}...`);
+        console.log(`${appLanguage() === "en" ? "Network did not respond, retrying" : "Сеть не ответила, пробую ещё раз"} ${attempt}/${retries}...`);
         await sleep(700 * attempt);
       }
     }
   }
 
-  throw new Error(`fetch failed: ${lastError?.message || "network error"}. Если без VPN SoundCloud не открывается даже через curl, программа это не исправит без прокси/другой сети.`);
+  const en = appLanguage() === "en";
+  throw new Error(en
+    ? `fetch failed: ${lastError?.message || "network error"}. If SoundCloud does not open without VPN, SRM cannot fix it without a proxy or another network.`
+    : `fetch failed: ${lastError?.message || "network error"}. Если без VPN SoundCloud не открывается даже через curl, программа это не исправит без прокси/другой сети.`
+  );
 }
 
 async function fetchText(url) {
@@ -656,13 +939,13 @@ async function collectTracksFromSource(sourceUrl, clientId) {
     const profileUrl = profileUrlFromLikesUrl(sourceUrl);
     const user = await resolveSoundCloudUrl(profileUrl, clientId);
     if (user.kind !== "user") throw new Error("Ссылка /likes есть, но профиль SoundCloud не найден.");
-    console.log(`Профиль найден: ${user.username || user.permalink || user.id}`);
+    console.log(`${tt("profileFound")}: ${user.username || user.permalink || user.id}`);
     return collectLikesTracks(user, clientId);
   }
   const resolved = await resolveSoundCloudUrl(sourceUrl, clientId);
   if (resolved.kind === "track") return isPlayableTrack(resolved) ? [resolved] : [];
   if (resolved.kind === "playlist") {
-    console.log(`Плейлист найден: ${resolved.title || resolved.permalink || resolved.id}`);
+    console.log(`${appLanguage() === "en" ? "Playlist found" : "Плейлист найден"}: ${resolved.title || resolved.permalink || resolved.id}`);
     return collectPlaylistTracks(resolved, clientId);
   }
   if (resolved.kind === "user") throw new Error("Это ссылка на профиль. Нужна /likes или /sets/...");
@@ -756,7 +1039,7 @@ async function getStreamUrl(track, clientId, allowFreshResolve = true) {
     for (let attempt = 1; attempt <= streamRetries; attempt += 1) {
       try {
         if (trackDelayMs > 0 && attempt > 1) await sleep(trackDelayMs * attempt);
-        if (attempt > 1) console.log(`Повтор stream ${attempt}/${streamRetries}: ${label}`);
+        if (attempt > 1) console.log(`${appLanguage() === "en" ? "Stream retry" : "Повтор stream"} ${attempt}/${streamRetries}: ${label}`);
         const streamUrl = await getPlaybackUrlFromTranscoding(track, transcoding, activeClientId);
         await validatePlaybackUrl(streamUrl);
         return streamUrl;
@@ -784,7 +1067,7 @@ async function getStreamUrl(track, clientId, allowFreshResolve = true) {
 
   if (allowFreshResolve && track.permalink_url) {
     try {
-      console.log("Обновляю данные трека и пробую ещё раз...");
+      console.log(appLanguage() === "en" ? "Refreshing track data and trying again..." : "Обновляю данные трека и пробую ещё раз...");
       const freshTrack = await resolveSoundCloudUrl(track.permalink_url, activeClientId);
       if (freshTrack?.kind === "track" && freshTrack?.id !== undefined) {
         await sleep(trackDelayMs || 900);
@@ -876,14 +1159,10 @@ function stopProcessTree(child) {
 
 
 function cookieBrowserCandidates(config, explicit = null) {
-  const raw = String(explicit || config.browserPlayer?.cookieBrowser || "auto").toLowerCase().trim();
-  if (!raw || raw === "off" || raw === "none" || raw === "false") return [];
-  if (raw !== "auto") return [raw];
-  // yt-dlp поддерживает cookies-from-browser. Пробуем популярные браузеры.
-  // Если пользователь залогинен в SoundCloud хотя бы в одном из них, mpv/yt-dlp сможет выглядеть ближе к обычному браузерному пользователю.
-  if (process.platform === "darwin") return ["safari", "chrome", "edge"];
-  if (process.platform === "win32") return ["edge", "chrome"];
-  return ["edge", "chrome"];
+  // Cookies mode was removed in Windows 2.29.0.
+  // On this setup it caused long waits and repeated Edge/Chrome database errors,
+  // while SoundCloud API + plain yt-dlp worked better.
+  return [];
 }
 
 function looksLikePath(command) {
@@ -965,9 +1244,9 @@ async function resolveWithYtDlp(trackUrl, cookieBrowser = "") {
   const args = [
     "-g",
     "--no-playlist",
-    "--extractor-retries", "3",
-    "--fragment-retries", "3",
-    "--socket-timeout", "15",
+    "--extractor-retries", "1",
+    "--fragment-retries", "1",
+    "--socket-timeout", "6",
     "--user-agent", BROWSER_UA,
     "--referer", "https://soundcloud.com/"
   ];
@@ -977,7 +1256,7 @@ async function resolveWithYtDlp(trackUrl, cookieBrowser = "") {
   let lastError = "";
   for (const command of ytDlpCandidates()) {
     try {
-      const out = await execFileText(command, args, { timeout: 30000 });
+      const out = await execFileText(command, args, { timeout: 10000 });
       const urls = out.split(/\r?\n/).map((line) => line.trim()).filter((line) => /^https?:\/\//i.test(line));
       if (urls.length > 0) return urls[0];
     } catch (error) {
@@ -988,8 +1267,10 @@ async function resolveWithYtDlp(trackUrl, cookieBrowser = "") {
 }
 
 function getPlaybackMethod(config) {
-  const raw = String(valueOf("--method") || config.playback?.method || "auto").toLowerCase().trim();
-  const allowed = new Set(["smart", "auto", "soundcloud-api-first", "yt-dlp-first", "yt-dlp-cookies-first"]);
+  let raw = String(valueOf("--method") || config.playback?.method || "smart").toLowerCase().trim();
+  // Backward compatibility for old configs. Cookies are disabled in Windows 2.29.0.
+  if (raw === "yt-dlp-cookies-first" || raw === "auto") raw = "smart";
+  const allowed = new Set(["smart", "soundcloud-api-first", "yt-dlp-first"]);
   return allowed.has(raw) ? raw : "smart";
 }
 
@@ -1018,8 +1299,8 @@ async function downloadWithYtDlp(trackUrl, config) {
     const args = [
       "--no-playlist",
       "-f", "bestaudio/best",
-      "--extractor-retries", "3",
-      "--fragment-retries", "3",
+      "--extractor-retries", "1",
+      "--fragment-retries", "1",
       "--socket-timeout", "20",
       "--user-agent", BROWSER_UA,
       "--referer", "https://soundcloud.com/",
@@ -1031,8 +1312,8 @@ async function downloadWithYtDlp(trackUrl, config) {
 
     for (const command of ytDlpCandidates()) {
       try {
-        console.log(`Скачиваю во временный файл через yt-dlp${browser ? ` + cookies ${browser}` : ""}...`);
-        const out = await execFileText(command, args, { timeout: 120000 });
+        console.log(`${appLanguage() === "en" ? "Downloading temporary file through yt-dlp" : "Скачиваю во временный файл через yt-dlp"}${browser ? ` + cookies ${browser}` : ""}...`);
+        const out = await execFileText(command, args, { timeout: 25000 });
         const file = out.split(/\r?\n/).map((line) => line.trim()).filter(Boolean).reverse().find((line) => existsSync(line));
         if (file) return { kind: "file", value: file, tempFile: file };
       } catch (error) {
@@ -1055,67 +1336,40 @@ async function resolveByMethod(track, config, clientId) {
   if (!url) throw new Error("У трека нет permalink_url.");
 
   const tryApi = async () => {
-    console.log("Метод: SoundCloud stream API");
+    console.log(tt("methodApi"));
     return await getStreamUrl(track, clientId);
   };
   const tryYtdlp = async (browser = "") => {
-    console.log(`Метод: yt-dlp${browser ? ` + cookies ${browser}` : ""}`);
+    console.log(`${tt("methodYtdlp")}${browser ? ` + cookies ${browser}` : ""}`);
     return await resolveWithYtDlp(url, browser);
   };
   const tryCookieYtdlp = async () => {
-    const browsers = cookieBrowserCandidates(config, valueOf("--cookies-browser"));
-    if (browsers.length === 0) throw new Error("cookies browser выключен. Включи Edge/Chrome/Safari или auto.");
-    let lastError = null;
-    for (const browser of browsers) {
-      try { return await tryYtdlp(browser); }
-      catch (error) { lastError = error; console.log(`yt-dlp cookies ${browser} не помог: ${String(error.shortMessage || error.message || error).split("\n")[0]}`); }
-    }
-    throw lastError || new Error("yt-dlp cookies не вернул playable URL");
+    throw new Error(appLanguage() === "en" ? "cookies mode is disabled" : "режим cookies отключён");
   };
 
   if (method === "smart") {
-    // Windows default: сначала SoundCloud API, потому что по твоим логам он реально запускает треки,
-    // а yt-dlp cookies часто падает на заблокированной/занятой базе Edge/Chrome.
-    // Если API не даст поток, тогда пробуем yt-dlp без cookies и только потом cookies.
+    // Windows default: fast mode without cookies.
+    // Cookies caused repeated Edge/Chrome database errors and long waits.
     try { return await tryApi(); }
     catch (apiError) {
-      console.log(`SoundCloud API не дал поток, пробую yt-dlp: ${String(apiError.shortMessage || apiError.message || apiError).split("\n")[0]}`);
+      console.log(`${appLanguage() === "en" ? "SoundCloud API did not return a stream, trying yt-dlp" : "SoundCloud API не дал поток, пробую yt-dlp"}: ${String(apiError.shortMessage || apiError.message || apiError).split("\n")[0]}`);
     }
-    try { return await tryYtdlp(""); }
-    catch (ytdlpError) {
-      console.log(`yt-dlp без cookies не помог, пробую cookies: ${String(ytdlpError.shortMessage || ytdlpError.message || ytdlpError).split("\n")[0]}`);
-    }
-    return await tryCookieYtdlp();
+    return await tryYtdlp("");
   }
 
   if (method === "soundcloud-api-first") {
     try { return await tryApi(); }
-    catch (error) { console.log(`SoundCloud API не помог, пробую yt-dlp: ${String(error.shortMessage || error.message || error).split("\n")[0]}`); }
-    try { return await tryYtdlp(""); }
-    catch (error) { console.log(`yt-dlp не помог, пробую cookies: ${String(error.shortMessage || error.message || error).split("\n")[0]}`); }
-    return await tryCookieYtdlp();
+    catch (error) { console.log(`${appLanguage() === "en" ? "SoundCloud API failed, trying yt-dlp" : "SoundCloud API не помог, пробую yt-dlp"}: ${String(error.shortMessage || error.message || error).split("\n")[0]}`); }
+    return await tryYtdlp("");
   }
   if (method === "yt-dlp-first") {
     try { return await tryYtdlp(""); }
-    catch (error) { console.log(`yt-dlp не помог, пробую SoundCloud API: ${String(error.shortMessage || error.message || error).split("\n")[0]}`); return await tryApi(); }
+    catch (error) { console.log(`${appLanguage() === "en" ? "yt-dlp failed, trying SoundCloud API" : "yt-dlp не помог, пробую SoundCloud API"}: ${String(error.shortMessage || error.message || error).split("\n")[0]}`); return await tryApi(); }
   }
-  if (method === "yt-dlp-cookies-first") {
-    try { return await tryCookieYtdlp(); }
-    catch (error) { console.log(`yt-dlp cookies не помог, пробую SoundCloud API: ${String(error.shortMessage || error.message || error).split("\n")[0]}`); return await tryApi(); }
-  }
-
-  // auto оставлен для старых конфигов: cookies -> yt-dlp -> API.
-  try { return await tryCookieYtdlp(); }
-  catch (cookieError) {
-    console.log(`yt-dlp+cookies не помог: ${String(cookieError.shortMessage || cookieError.message || cookieError).split("\n")[0]}`);
-  }
-  try { return await tryYtdlp(""); }
-  catch (ytdlpError) {
-    console.log(`yt-dlp без cookies не помог: ${String(ytdlpError.shortMessage || ytdlpError.message || ytdlpError).split("\n")[0]}`);
-  }
+  // Legacy auto/cookies methods are mapped to smart by getPlaybackMethod().
   try { return await tryApi(); }
   catch (apiError) {
-    console.log(`SoundCloud API тоже не дал поток: ${String(apiError.message || apiError).split("\n")[0]}`);
+    console.log(`${appLanguage() === "en" ? "SoundCloud API also did not return a stream" : "SoundCloud API тоже не дал поток"}: ${String(apiError.message || apiError).split("\n")[0]}`);
     throw apiError;
   }
 }
@@ -1124,7 +1378,7 @@ async function playStreamInteractive(playUrl, config, options = {}) {
   const player = selectPlayer(config);
   if (!player) { printPlayerInstallHelp(); return "no-player"; }
 
-  console.log(`Плеер: ${player.name}`);
+  console.log(`${t(config, "player")}: ${player.name}`);
 
   return new Promise((resolve, reject) => {
     let resolved = false;
@@ -1177,17 +1431,17 @@ async function playStreamInteractive(playUrl, config, options = {}) {
 
     let controlIndex = 0;
     const controlItems = [
-      { label: "Дальше", action: "next" },
-      { label: "Назад", action: "previous" },
-      { label: "Пауза", action: "pause" },
-      { label: "Повтор", action: "repeat" },
-      { label: "Звук", action: "volume" },
-      { label: "Меню", action: "quit" }
+      { label: t(config, "next"), action: "next" },
+      { label: t(config, "prev"), action: "previous" },
+      { label: t(config, "pause"), action: "pause" },
+      { label: t(config, "repeat"), action: "repeat" },
+      { label: t(config, "volume"), action: "volume" },
+      { label: t(config, "menu"), action: "quit" }
     ];
     const controlLabel = (item) => {
-      if (item.action === "pause") return paused ? "Играть" : "Пауза";
-      if (item.action === "repeat") return `Повт:${repeatEnabled ? "вкл" : "выкл"}`;
-      if (item.action === "volume") return volumeMode ? `Звук:${volume}% ${progressBar(volume, 100, 6)}` : `Звук:${volume}%`;
+      if (item.action === "pause") return paused ? t(config, "resume") : t(config, "pause");
+      if (item.action === "repeat") return `${t(config, "repeatShort")}:${repeatEnabled ? t(config, "on") : t(config, "off")}`;
+      if (item.action === "volume") return volumeMode ? `${t(config, "volume")}:${volume}% ${progressBar(volume, 100, 6)}` : `${t(config, "volume")}:${volume}%`;
       return item.label;
     };
     const controlsText = () => controlItems.map((item, index) => {
@@ -1209,7 +1463,7 @@ async function playStreamInteractive(playUrl, config, options = {}) {
       const remaining = lastDuration > 0 ? ` -${formatTime(Math.max(0, lastDuration - lastTimePos))}` : "";
       const session = Number(options.sessionPlayedCount) >= 0 ? ` | S:${options.sessionPlayedCount}` : "";
       const bar = progressBar(lastTimePos, lastDuration, 10);
-      const base = `${paused ? "Пауза" : "Играет"} ${current}${total}${remaining} ${bar} | ${controlsText()}${session}`;
+      const base = `${paused ? t(config, "paused") : t(config, "playing")} ${current}${total}${remaining} ${bar} | ${controlsText()}${session}`;
       return paused ? color.yellow(base) : color.green(base);
     };
 
@@ -1303,15 +1557,35 @@ async function playStreamInteractive(playUrl, config, options = {}) {
       applyVolume(volume + delta);
     }
 
-    console.log("Проверяю трек...");
+    console.log(t(config, "checkingTrack"));
 
     // Для mpv берём реальное время из плеера. Счётчик начинает идти только когда mpv отдаёт time-pos > 0.
     // Для остальных плееров остаётся мягкий fallback, потому что у них нет простого IPC.
     let fallbackStartedAt = null;
-    const startupTimeoutMs = Math.max(8000, Number(config.network?.startupTimeoutMs || 18000));
+    const startupTimeoutMs = Math.max(4000, Number(config.network?.startupTimeoutMs || 6500));
+    const softStartFallback = options.softStartFallback !== false;
     const startupTimer = setTimeout(() => {
       if (!resolved && player.name === "mpv" && !hasRealPlaybackSignal) {
-        writeStatusLine("Трек не начал играть, пробую другой способ...");
+        // Windows/mpv sometimes starts audible playback before IPC time-pos begins
+        // responding. Do not kill an actually playing track just because the IPC
+        // timer is late. Switch to a soft timer and let mpv exit naturally.
+        if (softStartFallback) {
+          hasRealPlaybackSignal = true;
+          fallbackStartedAt = Date.now();
+          if (typeof options.onStarted === "function") {
+            try { options.onStarted(); } catch {}
+          }
+          if (!announcedPlayback) {
+            announcedPlayback = true;
+            const titleLine = options.title ? `${t(config, "nowPlaying")}: ${options.title}` : t(config, "trackStarted");
+            const urlLine = options.url ? `\n${options.url}` : "";
+            process.stdout.write("\r\x1b[2K");
+            console.log(`${titleLine}${urlLine}`);
+          }
+          writeStatusLine(statusText());
+          return;
+        }
+        writeStatusLine(t(config, "trackNotStarted"));
         finish("failed");
       }
     }, startupTimeoutMs);
@@ -1319,8 +1593,12 @@ async function playStreamInteractive(playUrl, config, options = {}) {
 
     const statusTimer = setInterval(async () => {
       if (player.name === "mpv") {
-        const answer = await mpvCommand(["get_property", "time-pos"], 500);
-        const pos = Number(answer?.data);
+        let answer = await mpvCommand(["get_property", "time-pos"], 500);
+        let pos = Number(answer?.data);
+        if (!Number.isFinite(pos)) {
+          answer = await mpvCommand(["get_property", "playback-time"], 500);
+          pos = Number(answer?.data);
+        }
         if (Number.isFinite(pos) && pos > 0) {
           lastTimePos = pos;
           if (!hasRealPlaybackSignal) {
@@ -1331,11 +1609,13 @@ async function playStreamInteractive(playUrl, config, options = {}) {
           }
           if (!announcedPlayback) {
             announcedPlayback = true;
-            const titleLine = options.title ? `Сейчас играет: ${options.title}` : "Трек запущен";
+            const titleLine = options.title ? `${t(config, "nowPlaying")}: ${options.title}` : t(config, "trackStarted");
             const urlLine = options.url ? `\n${options.url}` : "";
             process.stdout.write("\r\x1b[2K");
             console.log(`${titleLine}${urlLine}`);
           }
+        } else if (hasRealPlaybackSignal && fallbackStartedAt && !paused) {
+          lastTimePos = Math.max(lastTimePos, (Date.now() - fallbackStartedAt) / 1000);
         }
         if (hasRealPlaybackSignal && player.name === "mpv") {
           const durationAnswer = await mpvCommand(["get_property", "duration"], 500);
@@ -1345,7 +1625,7 @@ async function playStreamInteractive(playUrl, config, options = {}) {
         if (!hasRealPlaybackSignal) {
           if (Date.now() - lastCheckPrintedAt > 2500) {
             lastCheckPrintedAt = Date.now();
-            writeStatusLine("Жду реального старта звука...");
+            writeStatusLine(t(config, "waitingSound"));
           }
           return;
         }
@@ -1412,7 +1692,7 @@ async function playStreamInteractive(playUrl, config, options = {}) {
 
     const inputMode = valueOf("--input") || config.controls?.inputMode || "auto";
     if (inputMode === "line") {
-      console.log("Режим ввода: команды с Enter. Напиши n / b / p / q и нажми Enter.");
+      console.log(t(config, "inputLineMode"));
       process.stdin.setEncoding("utf8");
       process.stdin.resume();
       process.stdin.on("data", onDataFallback);
@@ -1530,10 +1810,10 @@ async function playBrowserInteractive(track, config, options = {}) {
   let elapsed = 0;
   let paused = false;
 
-  console.log("Браузерный режим: открываю трек в выбранном браузере.");
-  console.log(`Трек: ${displayTrack(track)}`);
+  console.log(appLanguage() === "en" ? "Browser mode: opening track in selected browser." : "Браузерный режим: открываю трек в выбранном браузере.");
+  console.log(`${appLanguage() === "en" ? "Track" : "Трек"}: ${displayTrack(track)}`);
   console.log(track.permalink_url);
-  console.log("Если звук не стартовал автоматически, включи трек в браузере один раз. Дальше переключай из терминала.");
+  console.log(appLanguage() === "en" ? "If audio does not start automatically, start the track in the browser once. Then switch tracks from the terminal." : "Если звук не стартовал автоматически, включи трек в браузере один раз. Дальше переключай из терминала.");
   openUrlInBackground(track.permalink_url, config);
 
   const formatTime = (seconds) => {
@@ -1633,16 +1913,16 @@ async function playBrowserInteractive(track, config, options = {}) {
   });
 }
 
-async function loadTracksForSources(sources, clientId) {
+async function loadTracksForSources(sources, clientId, config) {
   const all = [];
   for (const [index, source] of sources.entries()) {
     try {
-      console.log(`\n[${index + 1}/${sources.length}] Источник: ${source.name}`);
+      console.log(`\n[${index + 1}/${sources.length}] ${t(config, "source")}: ${source.name}`);
       const tracks = await collectTracksFromSource(source.url, clientId);
-      console.log(`Треков из источника: ${tracks.length}`);
+      console.log(`${t(config, "tracksFromSource")}: ${tracks.length}`);
       all.push(...tracks);
     } catch (error) {
-      console.log(`Источник пропущен: ${error.message}`);
+      console.log(`${langOf(config) === "en" ? "Source skipped" : "Источник пропущен"}: ${error.message}`);
     }
   }
   return uniqueById(all);
@@ -1662,11 +1942,11 @@ async function runPlayer(explicitUrl = null) {
   const sources = getActiveSources(config, explicitUrl);
   if (sources.length === 0) throw new Error(`Нет источников. Добавь: srm --add likes https://soundcloud.com/arx_1/likes`);
 
-  console.log(`Файл настроек: ${CONFIG_PATH}`);
-  console.log(`Режим: ${explicitUrl ? "url" : config.defaultSource}`);
-  console.log("Ищу публичный ключ SoundCloud web app...");
+  console.log(`${t(config, "fileSettings")}: ${CONFIG_PATH}`);
+  console.log(`${t(config, "mode")}: ${explicitUrl ? "url" : config.defaultSource}`);
+  console.log(t(config, "searchingClient"));
   const clientId = await findWebClientId();
-  const tracks = await loadTracksForSources(sources, clientId);
+  const tracks = await loadTracksForSources(sources, clientId, config);
 
   if (tracks.length === 0) throw new Error("Не нашла доступные треки. Возможно, лайки/плейлист закрыты или сеть режет SoundCloud.");
 
@@ -1678,10 +1958,10 @@ async function runPlayer(explicitUrl = null) {
     return key && !blacklistKeys.has(key) && !playedKeys.has(key);
   });
 
-  console.log(`\nВсего треков из источников: ${tracks.length}`);
-  console.log(`В чёрном списке: ${blacklistKeys.size}`);
-  console.log(`Уже прослушано: ${playedKeys.size}`);
-  console.log(`Доступно для рандома сейчас: ${available.length}`);
+  console.log(`\n${t(config, "totalTracks")}: ${tracks.length}`);
+  console.log(`${t(config, "blacklist")}: ${blacklistKeys.size}`);
+  console.log(`${t(config, "played")}: ${playedKeys.size}`);
+  console.log(`${t(config, "available")}: ${available.length}`);
 
   if (available.length === 0) {
     throw new Error(`Нет новых треков для проигрывания. Можно очистить историю: srm --clear-played или чёрный список: srm --clear-blacklist`);
@@ -1733,7 +2013,7 @@ async function runPlayer(explicitUrl = null) {
   const buildPlayItem = async (track, { quiet = false } = {}) => {
     const work = async () => {
       const mode = getPlaybackMode(config);
-      if (!quiet) console.log(`Получаю аудио... (получение: ${getPlaybackMethod(config)}, воспроизведение: ${mode})`);
+      if (!quiet) console.log(`${t(config, "gettingAudio")}... (${t(config, "resolving")}: ${getPlaybackMethod(config)}, ${t(config, "playback")}: ${mode})`);
       if (mode === "download-temp") return await downloadWithYtDlp(track.permalink_url, config);
       return { kind: "url", value: await resolveByMethod(track, config, clientId) };
     };
@@ -1771,11 +2051,17 @@ async function runPlayer(explicitUrl = null) {
         if (stillNeeded) playCache.set(key, item);
         else cleanupPlayItem(item);
         return item;
+      } catch (error) {
+        // Preload must never crash the player. Some yt-dlp cookie errors happen
+        // while another browser is open/locked; the current track should keep playing.
+        return null;
       } finally {
         preloadPromises.delete(key);
       }
     })();
-    preloadPromises.set(key, promise);
+    // Attach a catch immediately so Node does not treat a preload failure as
+    // an unhandled rejection. The awaited path below will simply rebuild audio.
+    preloadPromises.set(key, promise.catch(() => null));
   };
 
   while (keepGoing && (available.length > 0 || currentTrack)) {
@@ -1786,10 +2072,10 @@ async function runPlayer(explicitUrl = null) {
 
     if (!track) break;
 
-    console.log(`\nСлучайный трек: ${displayTrack(track)}`);
+    console.log(`\n${t(config, "randomTrack")}: ${displayTrack(track)}`);
     console.log(track.permalink_url);
-    if (previousTrack) console.log(`Назад доступно: ${displayTrack(previousTrack)} (кнопка Назад)`);
-    if (nextTrack) console.log(`Следующий из истории: ${displayTrack(nextTrack)}`);
+    if (previousTrack) console.log(`${t(config, "previousAvailable")}: ${displayTrack(previousTrack)} (${t(config, "buttonBack")})`);
+    if (nextTrack) console.log(`${t(config, "nextFromHistory")}: ${displayTrack(nextTrack)}`);
 
     if (hasFlag("--open")) { openUrl(track.permalink_url); return; }
     if (hasFlag("--no-play")) return;
@@ -1802,17 +2088,18 @@ async function runPlayer(explicitUrl = null) {
       if (delayMs > 0) await sleep(delayMs);
       const cached = playCache.get(track.permalink_url);
       if (cached) {
-        console.log("Беру аудио из кэша прошлой/текущей/следующей песни...");
+        console.log(t(config, "cacheAudio"));
         playItem = cached;
       } else if (preloadPromises.has(track.permalink_url)) {
-        console.log("Следующая песня уже загружается, жду готовый аудио-поток...");
+        console.log(t(config, "preloadWaiting"));
         try {
           playItem = await preloadPromises.get(track.permalink_url);
+          if (!playItem) throw new Error("preload failed");
         } catch {
-          console.log("Предзагрузка не помогла, получаю аудио заново...");
+          console.log(t(config, "preloadFailed"));
           playItem = await buildPlayItem(track);
         }
-        playCache.set(track.permalink_url, playItem);
+        if (playItem) playCache.set(track.permalink_url, playItem);
       } else {
         playItem = await buildPlayItem(track);
         playCache.set(track.permalink_url, playItem);
@@ -1823,8 +2110,8 @@ async function runPlayer(explicitUrl = null) {
       if (key) blacklistKeys.add(key);
       if (index >= 0) available.splice(index, 1);
       currentTrack = null;
-      console.log(`Трек добавлен в чёрный список: ${error.message}`);
-      console.log(`Осталось треков для рандома: ${available.length}`);
+      console.log(`${appLanguage() === "en" ? "Track added to blacklist" : "Трек добавлен в чёрный список"}: ${error.message}`);
+      console.log(`${appLanguage() === "en" ? "Tracks left for random" : "Осталось треков для рандома"}: ${available.length}`);
       if (available.length === 0) throw new Error("Все выбранные треки оказались недоступны для проигрывания.");
       continue;
     }
@@ -1851,6 +2138,7 @@ async function runPlayer(explicitUrl = null) {
       volume: currentVolume,
       onVolumeChanged,
       onStarted: handleStarted,
+      softStartFallback: true,
       onFinished: (info) => {
         lastPlaySeconds = Math.max(lastPlaySeconds, Number(info?.durationSec) || 0);
         lastTotalDurationSec = Math.max(lastTotalDurationSec, Number(info?.totalDurationSec) || 0);
@@ -1858,7 +2146,7 @@ async function runPlayer(explicitUrl = null) {
     });
 
     if (action === "failed" && config.network?.fallbackToPermalink !== false && track.permalink_url) {
-      console.log("Stream URL не заиграл. Пробую открыть саму ссылку трека через mpv/yt-dlp...");
+      console.log(appLanguage() === "en" ? "Stream URL did not play. Trying the track URL through mpv/yt-dlp..." : "Stream URL не заиграл. Пробую открыть саму ссылку трека через mpv/yt-dlp...");
       action = await playStreamInteractive(track.permalink_url, config, {
         startDelayMs: 1800,
         title: displayTrack(track),
@@ -1879,7 +2167,7 @@ async function runPlayer(explicitUrl = null) {
       if (action === "failed") {
         const browsers = cookieBrowserCandidates(config, valueOf("--cookies-browser"));
         for (const browser of browsers) {
-          console.log(`Пробую через cookies браузера: ${browser}...`);
+          console.log(`${appLanguage() === "en" ? "Trying browser cookies" : "Пробую через cookies браузера"}: ${browser}...`);
           action = await playStreamInteractive(track.permalink_url, config, {
             startDelayMs: 1800,
             title: displayTrack(track),
@@ -1909,7 +2197,7 @@ async function runPlayer(explicitUrl = null) {
           if (seenDirect.has(directKey)) continue;
           seenDirect.add(directKey);
           try {
-            console.log(`Пробую прямой URL через yt-dlp${browser ? ` + cookies ${browser}` : ""}...`);
+            console.log(`${appLanguage() === "en" ? "Trying direct URL through yt-dlp" : "Пробую прямой URL через yt-dlp"}${browser ? ` + cookies ${browser}` : ""}...`);
             const directUrl = await resolveWithYtDlp(track.permalink_url, browser);
             action = await playStreamInteractive(directUrl, config, {
               startDelayMs: 1600,
@@ -1929,15 +2217,15 @@ async function runPlayer(explicitUrl = null) {
             });
             if (action !== "failed") break;
           } catch (error) {
-            console.log(`yt-dlp не помог: ${String(error.shortMessage || error.message || error).split("\n")[0]}`);
+            console.log(`${appLanguage() === "en" ? "yt-dlp failed" : "yt-dlp не помог"}: ${String(error.shortMessage || error.message || error).split("\n")[0]}`);
           }
         }
       }
     }
 
-    if (action === "failed" && getPlaybackMode(config) === "auto") {
+    if (action === "failed" && getPlaybackMode(config) === "auto" && config.playback?.tempDownloadFallback === true) {
       try {
-        console.log("Поток не заиграл. Пробую скачать трек во временный файл и включить локально...");
+        console.log(appLanguage() === "en" ? "Stream did not play. Trying temporary download and local playback..." : "Поток не заиграл. Пробую скачать трек во временный файл и включить локально...");
         const downloaded = await downloadWithYtDlp(track.permalink_url, config);
         cleanupPlayItem(playItem);
         playItem = downloaded;
@@ -1959,7 +2247,7 @@ async function runPlayer(explicitUrl = null) {
       }
         });
       } catch (error) {
-        console.log(`Временная загрузка не помогла: ${String(error.message || error).split("\n")[0]}`);
+        console.log(`${appLanguage() === "en" ? "Temporary download failed" : "Временная загрузка не помогла"}: ${String(error.message || error).split("\n")[0]}`);
       }
     }
 
@@ -1972,7 +2260,7 @@ async function runPlayer(explicitUrl = null) {
       appendHistoryEntry(state, track, { durationSec: lastPlaySeconds || Number(track.duration || 0) / 1000 });
       sessionPlayedCount += 1;
       sessionSeconds += Math.max(0, Math.floor(lastPlaySeconds || Number(track.duration || 0) / 1000));
-      console.log(color.dim(`Сессия: ${sessionPlayedCount} треков, ${formatTime(sessionSeconds)}`));
+      console.log(color.dim(`${t(config, "session")}: ${sessionPlayedCount} ${t(config, "tracks")}, ${formatTime(sessionSeconds)}`));
       if (key) {
         playedKeys.add(key);
         removeFromAvailableByKey(available, key);
@@ -1999,10 +2287,10 @@ async function runPlayer(explicitUrl = null) {
       }
       if (shortPlaybackStreak >= 2) {
         console.log("");
-        console.log(color.yellow("Внимание: два трека подряд длились 30 секунд или меньше."));
-        console.log(color.yellow("Похоже, SoundCloud/mpv мог отдать короткие preview-потоки."));
-        console.log(color.yellow("Лучше перезапусти SRM через start.bat, чтобы обновить сессию и ключи."));
-        console.log(color.dim("Если эти треки реально короткие, просто запусти рандом снова."));
+        console.log(color.yellow(t(config, "shortWarn1")));
+        console.log(color.yellow(t(config, "shortWarn2")));
+        console.log(color.yellow(t(config, "shortWarn3")));
+        console.log(color.dim(t(config, "shortWarn4")));
         prunePlayCache();
         return true;
       }
@@ -2028,7 +2316,7 @@ async function runPlayer(explicitUrl = null) {
         prunePlayCache(previousTrack, currentTrack, nextTrack);
         keepGoing = true;
       } else {
-        console.log("Назад пока нельзя: предыдущей песни ещё нет.");
+        console.log(t(config, "noPrevious"));
         currentTrack = track;
         keepGoing = true;
       }
@@ -2039,7 +2327,7 @@ async function runPlayer(explicitUrl = null) {
       if (index >= 0) available.splice(index, 1);
       currentTrack = null;
       prunePlayCache(previousTrack, nextTrack);
-      console.log("Трек не заиграл в терминале, добавляю в чёрный список и беру следующий. Браузер больше не открываю.");
+      console.log(t(config, "playbackFailed"));
       keepGoing = available.length > 0;
     } else if (action === "quit" || action === "no-player") {
       markPlayedIfStarted();
@@ -2071,11 +2359,11 @@ async function runPlayer(explicitUrl = null) {
 }
 
 async function runDemo() {
-  console.log("Demo-режим: SoundCloud не трогаю.");
+  console.log(langOf(loadConfig()) === "en" ? "Demo mode: SoundCloud is not used." : "Demo-режим: SoundCloud не трогаю.");
   let keepGoing = true;
   while (keepGoing) {
     const track = pickRandom(DEMO_TRACKS);
-    console.log(`Выбран трек: ${displayTrack(track)}`);
+    console.log(`${langOf(loadConfig()) === "en" ? "Selected track" : "Выбран трек"}: ${displayTrack(track)}`);
     console.log(track.permalink_url);
     if (!hasFlag("--loop")) keepGoing = false;
   }
@@ -2099,7 +2387,7 @@ async function promptMenu(title, items) {
         const pointer = i === index ? ">" : " ";
         console.log(`${pointer} ${item.label}`);
       });
-      console.log("\nСтрелки вверх/вниз = выбор, Enter = открыть, q/Esc = выход/назад");
+      console.log(`\n${tt("menuHelp")}`);
     };
     const cleanup = () => {
       try { process.stdin.setRawMode(false); } catch {}
@@ -2124,41 +2412,14 @@ async function promptMenu(title, items) {
 }
 
 
-async function settingsMenu() {
-  while (true) {
-    const config = loadConfig();
-    const backend = config.browserPlayer?.backend || "mpv";
-    const cookieBrowser = config.browserPlayer?.cookieBrowser || "auto";
-    const inputMode = config.controls?.inputMode || "auto";
-    const proxyUrl = getProxyUrl(config) || "off";
-
-    const choice = await promptMenu("Настройки", [
-      { label: `Backend: mpv`, value: "backend" },
-      { label: `Браузер / cookies: ${cookieBrowser}`, value: "browser" },
-      { label: `Метод получения: ${getPlaybackMethod(config)}`, value: "method" },
-      { label: `Воспроизведение: ${getPlaybackMode(config)}`, value: "playback" },
-      { label: `Ввод: ${inputMode}`, value: "input" },
-      { label: `Прокси: ${proxyUrl}`, value: "proxy" },
-      { label: "Назад", value: "exit" }
-    ]);
-
-    if (choice === "exit") return;
-    if (choice === "backend") await backendSettingsMenu();
-    if (choice === "browser") await browserSettingsMenu();
-    if (choice === "method") await methodSettingsMenu();
-    if (choice === "playback") await playbackSettingsMenu();
-    if (choice === "input") await inputSettingsMenu();
-    if (choice === "proxy") await proxySettingsMenu();
-  }
-}
-
 async function backendSettingsMenu() {
+  const config = loadConfig();
   console.clear?.();
-  console.log("Backend");
+  console.log(t(config, "backendTitle"));
   console.log("=======");
-  console.log("\n[x] mpv быстрый режим через терминал");
-  console.log("\nБраузерный backend удалён: он открывал вкладки и не давал честно понять, играет ли звук.");
-  console.log("Нажми Enter, чтобы вернуться.");
+  console.log(`\n[x] ${t(config, "backendLine1")}`);
+  console.log(`\n${t(config, "backendLine2")}`);
+  console.log(t(config, "pressEnterBack"));
   await waitForEnter("");
 }
 
@@ -2167,13 +2428,13 @@ async function browserSettingsMenu() {
     const config = loadConfig();
     const cookieBrowser = config.browserPlayer?.cookieBrowser || "auto";
     const mark = (active) => active ? "[x]" : "[ ]";
-    const choice = await promptMenu("Настройки браузера / cookies", [
+    const choice = await promptMenu(t(config, "browserTitle"), [
       { label: `${mark(cookieBrowser === "auto")} auto`, value: "auto" },
       { label: `${mark(cookieBrowser === "edge")} Edge`, value: "edge" },
       { label: `${mark(cookieBrowser === "chrome")} Chrome`, value: "chrome" },
       { label: `${mark(cookieBrowser === "safari")} Safari`, value: "safari" },
       { label: `${mark(cookieBrowser === "off")} off`, value: "off" },
-      { label: "Назад", value: "exit" }
+      { label: t(config, "back"), value: "exit" }
     ]);
     if (choice === "exit") return;
 
@@ -2188,13 +2449,11 @@ async function methodSettingsMenu() {
     const config = loadConfig();
     const method = getPlaybackMethod(config);
     const mark = (active) => active ? "[x]" : "[ ]";
-    const choice = await promptMenu("Метод получения музыки", [
-      { label: `${mark(method === "smart")} smart: API -> yt-dlp -> cookies`, value: "smart" },
-      { label: `${mark(method === "auto")} auto: yt-dlp+cookies -> yt-dlp -> API`, value: "auto" },
+    const choice = await promptMenu(t(config, "methodTitle"), [
+      { label: `${mark(method === "smart")} smart: API -> yt-dlp`, value: "smart" },
       { label: `${mark(method === "soundcloud-api-first")} SoundCloud API first`, value: "soundcloud-api-first" },
       { label: `${mark(method === "yt-dlp-first")} yt-dlp first`, value: "yt-dlp-first" },
-      { label: `${mark(method === "yt-dlp-cookies-first")} yt-dlp + cookies first`, value: "yt-dlp-cookies-first" },
-      { label: "Назад", value: "exit" }
+      { label: t(config, "back"), value: "exit" }
     ]);
     if (choice === "exit") return;
 
@@ -2209,11 +2468,11 @@ async function playbackSettingsMenu() {
     const config = loadConfig();
     const mode = getPlaybackMode(config);
     const mark = (active) => active ? "[x]" : "[ ]";
-    const choice = await promptMenu("Метод воспроизведения", [
+    const choice = await promptMenu(t(config, "playbackTitle"), [
       { label: `${mark(mode === "auto")} auto: stream -> temp download`, value: "auto" },
-      { label: `${mark(mode === "stream")} stream через mpv`, value: "stream" },
-      { label: `${mark(mode === "download-temp")} скачать во временный файл и играть`, value: "download-temp" },
-      { label: "Назад", value: "exit" }
+      { label: `${mark(mode === "stream")} ${t(config, "playbackStream")}`, value: "stream" },
+      { label: `${mark(mode === "download-temp")} ${t(config, "playbackDownload")}`, value: "download-temp" },
+      { label: t(config, "back"), value: "exit" }
     ]);
     if (choice === "exit") return;
 
@@ -2228,11 +2487,11 @@ async function inputSettingsMenu() {
     const config = loadConfig();
     const inputMode = config.controls?.inputMode || "auto";
     const mark = (active) => active ? "[x]" : "[ ]";
-    const choice = await promptMenu("Настройки ввода", [
+    const choice = await promptMenu(t(config, "inputTitle"), [
       { label: `${mark(inputMode === "auto")} auto`, value: "auto" },
       { label: `${mark(inputMode === "raw")} raw`, value: "raw" },
       { label: `${mark(inputMode === "line")} line`, value: "line" },
-      { label: "Назад", value: "exit" }
+      { label: t(config, "back"), value: "exit" }
     ]);
     if (choice === "exit") return;
 
@@ -2242,15 +2501,33 @@ async function inputSettingsMenu() {
   }
 }
 
+async function languageSettingsMenu() {
+  while (true) {
+    const config = loadConfig();
+    const language = langOf(config);
+    const mark = (active) => active ? "[x]" : "[ ]";
+    const choice = await promptMenu(t(config, "langTitle"), [
+      { label: `${mark(language === "ru")} Русский`, value: "ru" },
+      { label: `${mark(language === "en")} English`, value: "en" },
+      { label: t(config, "back"), value: "exit" }
+    ]);
+    if (choice === "exit") return;
+
+    const nextConfig = loadConfig();
+    nextConfig.ui = { ...DEFAULT_CONFIG.ui, ...(nextConfig.ui || {}), language: choice };
+    saveConfig(nextConfig);
+  }
+}
+
 async function proxySettingsMenu() {
   while (true) {
     const config = loadConfig();
     const proxyUrl = getProxyUrl(config) || "off";
-    const choice = await promptMenu("Настройки прокси", [
-      { label: `Текущий прокси: ${proxyUrl}`, value: "noop" },
-      { label: "Указать прокси", value: "set" },
-      { label: "Отключить прокси", value: "clear" },
-      { label: "Назад", value: "exit" }
+    const choice = await promptMenu(t(config, "proxyTitle"), [
+      { label: `${t(config, "currentProxy")}: ${proxyUrl}`, value: "noop" },
+      { label: t(config, "setProxy"), value: "set" },
+      { label: t(config, "clearProxy"), value: "clear" },
+      { label: t(config, "back"), value: "exit" }
     ]);
     if (choice === "exit") return;
     if (choice === "noop") continue;
@@ -2258,7 +2535,7 @@ async function proxySettingsMenu() {
     const nextConfig = loadConfig();
     nextConfig.network = { ...DEFAULT_CONFIG.network, ...(nextConfig.network || {}) };
     if (choice === "set") {
-      const url = await ask("Прокси URL, например http://127.0.0.1:7890");
+      const url = await ask(t(config, "proxyPrompt"));
       if (url) nextConfig.network.proxyUrl = url.trim();
     }
     if (choice === "clear") {
@@ -2268,32 +2545,88 @@ async function proxySettingsMenu() {
   }
 }
 
-async function interactiveMenu() {
+async function settingsMenu() {
   while (true) {
-    const choice = await promptMenu("SoundCloud Random Music", [
-      { label: "Запустить рандом", value: "play" },
-      { label: "Добавить источник", value: "add" },
-      { label: "Показать источники", value: "list" },
-      { label: "Статистика", value: "stats" },
-      { label: "Настройки", value: "settings" },
-      { label: "Очистить прослушанные", value: "clear-played" },
-      { label: "Очистить чёрный список", value: "clear-blacklist" },
-      { label: "Выход", value: "exit" }
+    const config = loadConfig();
+    const cookieBrowser = config.browserPlayer?.cookieBrowser || "auto";
+    const inputMode = config.controls?.inputMode || "auto";
+    const proxyUrl = getProxyUrl(config) || "off";
+    const language = langOf(config);
+
+    const choice = await promptMenu(t(config, "settingsTitle"), [
+      { label: `${t(config, "settingsBackend")}: mpv`, value: "backend" },
+      { label: `${t(config, "settingsMethod")}: ${getPlaybackMethod(config)}`, value: "method" },
+      { label: `${t(config, "settingsPlayback")}: ${getPlaybackMode(config)}`, value: "playback" },
+      { label: `${t(config, "settingsInput")}: ${inputMode}`, value: "input" },
+      { label: `${t(config, "settingsLanguage")}: ${language === "en" ? "English" : "Русский"}`, value: "language" },
+      { label: `${t(config, "settingsProxy")}: ${proxyUrl}`, value: "proxy" },
+      { label: t(config, "back"), value: "exit" }
     ]);
 
-    if (choice === "play") { await runPlayer(null); continue; }
+    if (choice === "exit") return;
+    if (choice === "backend") await backendSettingsMenu();
+    if (choice === "method") await methodSettingsMenu();
+    if (choice === "playback") await playbackSettingsMenu();
+    if (choice === "input") await inputSettingsMenu();
+    if (choice === "language") await languageSettingsMenu();
+    if (choice === "proxy") await proxySettingsMenu();
+  }
+}
+
+function isNetworkAccessError(error) {
+  const message = String(error?.message || error || "");
+  return /fetch failed|ENOTFOUND|ECONN|ETIMEDOUT|network error|aborted|SoundCloud не открывается|SoundCloud.*not.*open/i.test(message);
+}
+
+async function handleInteractiveError(error) {
+  const config = loadConfig();
+  const en = langOf(config) === "en";
+  console.log("");
+  if (isNetworkAccessError(error)) {
+    console.log(en ? "Network problem: SoundCloud did not respond." : "Проблема с сетью: SoundCloud не ответил.");
+    console.log(en ? "Turn on VPN/proxy or check that SoundCloud opens in the browser, then try again." : "Включи VPN/прокси или проверь, что SoundCloud открывается в браузере, потом попробуй снова.");
+    console.log(en ? `Proxy can be set in Settings -> Proxy. Current config: ${CONFIG_PATH}` : `Прокси можно указать в Настройки -> Прокси. Текущий конфиг: ${CONFIG_PATH}`);
+  } else {
+    console.log(`${en ? "Error" : "Ошибка"}: ${error.message}`);
+  }
+  await waitForEnter(t(config, "pressEnterMenu"));
+}
+
+async function interactiveMenu() {
+  while (true) {
+    const configForUi = loadConfig();
+    const choice = await promptMenu("SoundCloud Random Music", [
+      { label: t(configForUi, "mainPlay"), value: "play" },
+      { label: t(configForUi, "mainAdd"), value: "add" },
+      { label: t(configForUi, "mainList"), value: "list" },
+      { label: t(configForUi, "mainStats"), value: "stats" },
+      { label: t(configForUi, "mainSettings"), value: "settings" },
+      { label: t(configForUi, "mainClearPlayed"), value: "clear-played" },
+      { label: t(configForUi, "mainClearBlacklist"), value: "clear-blacklist" },
+      { label: t(configForUi, "mainExit"), value: "exit" }
+    ]);
+
+    if (choice === "play") {
+      try {
+        await runPlayer(null);
+      } catch (error) {
+        await handleInteractiveError(error);
+      }
+      continue;
+    }
     if (choice === "exit") return;
     if (choice === "add") {
-      const name = await ask("Имя источника", "likes");
-      const url = await ask("Ссылка SoundCloud /likes или /sets/...");
+      const configForPrompt = loadConfig();
+      const name = await ask(t(configForPrompt, "sourceName"), "likes");
+      const url = await ask(t(configForPrompt, "sourceUrl"));
       if (url) {
         const config = loadConfig();
         config.sources = config.sources.filter((source) => source.name !== name);
         config.sources.push({ name, url: normalizeSoundCloudUrl(url), enabled: true });
         saveConfig(config);
-        console.log(`Добавлено: ${name}`);
+        console.log(`${t(config, "added")}: ${name}`);
       }
-      await waitForEnter("Нажми Enter, чтобы вернуться в меню.");
+      await waitForEnter(t(loadConfig(), "pressEnterMenu"));
     }
     if (choice === "list") {
       const config = loadConfig();
@@ -2302,14 +2635,15 @@ async function interactiveMenu() {
       console.log(`backend: ${config.browserPlayer?.backend || "mpv"}`);
       console.log(`cookiesBrowser: ${config.browserPlayer?.cookieBrowser || "auto"}`);
       console.log(`playbackMethod: ${getPlaybackMethod(config)}`);
+      console.log(`language: ${langOf(config)}`);
       console.log(`inputMode: ${config.controls?.inputMode || "auto"}`);
       console.log("");
       config.sources.forEach((source, index) => console.log(`${index + 1}. [${source.enabled === false ? "off" : "on"}] ${source.name} — ${source.url}`));
-      await waitForEnter("Нажми Enter, чтобы вернуться в меню.");
+      await waitForEnter(t(config, "pressEnterMenu"));
     }
     if (choice === "stats") {
       printStats();
-      await waitForEnter("Нажми Enter, чтобы вернуться в меню.");
+      await waitForEnter(t(loadConfig(), "pressEnterMenu"));
     }
     if (choice === "settings") {
       await settingsMenu();
@@ -2318,15 +2652,15 @@ async function interactiveMenu() {
       const state = loadState();
       state.played = [];
       saveState(state);
-      console.log("Прослушанные очищены.");
-      await waitForEnter("Нажми Enter, чтобы вернуться в меню.");
+      console.log(t(loadConfig(), "playedCleared"));
+      await waitForEnter(t(loadConfig(), "pressEnterMenu"));
     }
     if (choice === "clear-blacklist") {
       const state = loadState();
       state.blacklist = [];
       saveState(state);
-      console.log("Чёрный список очищен.");
-      await waitForEnter("Нажми Enter, чтобы вернуться в меню.");
+      console.log(t(loadConfig(), "blacklistCleared"));
+      await waitForEnter(t(loadConfig(), "pressEnterMenu"));
     }
   }
 }
@@ -2353,7 +2687,7 @@ async function runDiagnose() {
 
   try {
     const id = await findWebClientId({ refresh: true });
-    console.log(`client_id: найден и сохранён (${id.slice(0, 6)}...)`);
+    console.log(`client_id: ${appLanguage() === "en" ? "found and saved" : "найден и сохранён"} (${id.slice(0, 6)}...)`);
   } catch (error) {
     console.log(`client_id: FAIL — ${error.message}`);
   }
@@ -2371,8 +2705,8 @@ async function handleConfigCommands() {
   if (hasFlag("--show-config")) { console.log(JSON.stringify(config, null, 2)); return true; }
   if (hasFlag("--stats")) { printStats(); return true; }
   if (hasFlag("--show-state")) { console.log(JSON.stringify(loadState(), null, 2)); return true; }
-  if (hasFlag("--clear-played")) { const state = loadState(); state.played = []; saveState(state); console.log("Список прослушанных очищен"); return true; }
-  if (hasFlag("--clear-blacklist")) { const state = loadState(); state.blacklist = []; saveState(state); console.log("Чёрный список очищен"); return true; }
+  if (hasFlag("--clear-played")) { const state = loadState(); state.played = []; saveState(state); console.log(t(config, "playedCleared")); return true; }
+  if (hasFlag("--clear-blacklist")) { const state = loadState(); state.blacklist = []; saveState(state); console.log(t(config, "blacklistCleared")); return true; }
   if (hasFlag("--list")) {
     console.log(`config.json: ${CONFIG_PATH}`);
     console.log(`defaultSource: ${config.defaultSource}`);
@@ -2397,7 +2731,7 @@ async function handleConfigCommands() {
   if (hasFlag("--clear-proxy")) {
     config.network = { ...DEFAULT_CONFIG.network, ...(config.network || {}), proxyUrl: "" };
     saveConfig(config);
-    console.log("proxyUrl очищен");
+    console.log(langOf(config) === "en" ? "proxyUrl cleared" : "proxyUrl очищен");
     return true;
   }
   if (hasFlag("--browser-player")) {
@@ -2417,6 +2751,15 @@ async function handleConfigCommands() {
     console.log("backend: mpv");
     return true;
   }
+  if (hasFlag("--language") || hasFlag("--lang")) {
+    const language = String(valueOf("--language") || valueOf("--lang") || "").toLowerCase();
+    if (!["ru", "en", "russian", "english"].includes(language)) throw new Error("Format: srm --language ru/en");
+    const normalized = language === "english" ? "en" : language === "russian" ? "ru" : language;
+    config.ui = { ...DEFAULT_CONFIG.ui, ...(config.ui || {}), language: normalized };
+    saveConfig(config);
+    console.log(`language: ${normalized}`);
+    return true;
+  }
   if (hasFlag("--input")) {
     const mode = String(valueOf("--input") || "").toLowerCase();
     if (!["auto", "raw", "line"].includes(mode)) throw new Error("Формат: srm --input auto/raw/line");
@@ -2427,13 +2770,13 @@ async function handleConfigCommands() {
   }
   if (hasFlag("--safe-mode")) {
     config.playback = { ...DEFAULT_CONFIG.playback, ...(config.playback || {}), method: "smart", mode: "auto" };
-    config.browserPlayer = { ...DEFAULT_CONFIG.browserPlayer, ...(config.browserPlayer || {}), backend: "mpv", enabled: false, cookieBrowser: "edge" };
+    config.browserPlayer = { ...DEFAULT_CONFIG.browserPlayer, ...(config.browserPlayer || {}), backend: "mpv", enabled: false, cookieBrowser: "off" };
     config.player = "mpv";
     config.controls = { ...DEFAULT_CONFIG.controls, ...(config.controls || {}), inputMode: "auto" };
     saveConfig(config);
-    console.log("Включён рекомендованный режим:");
+    console.log(langOf(config) === "en" ? "Recommended mode enabled:" : "Включён рекомендованный режим:");
     console.log("method: smart");
-    console.log("cookiesBrowser: edge");
+    console.log("cookiesBrowser: off");
     console.log("playback: auto (stream -> temp download)");
     console.log("player: mpv");
     return;
@@ -2441,8 +2784,8 @@ async function handleConfigCommands() {
 
   if (hasFlag("--method")) {
     const method = String(valueOf("--method") || "").toLowerCase();
-    if (!["smart", "auto", "soundcloud-api-first", "yt-dlp-first", "yt-dlp-cookies-first"].includes(method)) {
-      throw new Error("Формат: srm --method smart/auto/soundcloud-api-first/yt-dlp-first/yt-dlp-cookies-first");
+    if (!["smart", "soundcloud-api-first", "yt-dlp-first"].includes(method)) {
+      throw new Error("Format: srm --method smart/soundcloud-api-first/yt-dlp-first");
     }
     config.playback = { ...DEFAULT_CONFIG.playback, ...(config.playback || {}), method };
     saveConfig(config);
@@ -2464,7 +2807,7 @@ async function handleConfigCommands() {
     saveConfig(config);
     cachedClientId = null;
     const id = await findWebClientId({ refresh: true });
-    console.log(`client_id обновлён: ${id.slice(0, 6)}...`);
+    console.log(`${langOf(config) === "en" ? "client_id refreshed" : "client_id обновлён"}: ${id.slice(0, 6)}...`);
     return true;
   }
   if (hasFlag("--diagnose")) {
@@ -2479,7 +2822,7 @@ async function handleConfigCommands() {
     next.push({ name, url: normalizeSoundCloudUrl(rawUrl), enabled: true });
     config.sources = next;
     saveConfig(config);
-    console.log(`Добавлено: ${name}`);
+    console.log(`${t(config, "added")}: ${name}`);
     return true;
   }
   if (hasFlag("--remove")) {
@@ -2487,12 +2830,12 @@ async function handleConfigCommands() {
     config.sources = config.sources.filter((source) => source.name !== name);
     if (config.defaultSource === name) config.defaultSource = "all";
     saveConfig(config);
-    console.log(`Удалено: ${name}`);
+    console.log(`${langOf(config) === "en" ? "Removed" : "Удалено"}: ${name}`);
     return true;
   }
   if (hasFlag("--default")) {
     const name = valueOf("--default");
-    if (name !== "all" && !config.sources.some((source) => source.name === name)) throw new Error(`Источник ${name} не найден.`);
+    if (name !== "all" && !config.sources.some((source) => source.name === name)) throw new Error(`${langOf(config) === "en" ? "Source not found" : "Источник не найден"}: ${name}`);
     config.defaultSource = name;
     saveConfig(config);
     console.log(`defaultSource: ${name}`);
@@ -2517,7 +2860,7 @@ async function main() {
 
   const explicitUrl = parsed.positional[0] || null;
   if (!explicitUrl && !existsSync(CONFIG_PATH)) {
-    console.log("Конфиг ещё не создан. Создаю пример...");
+    console.log(langOf(loadConfig()) === "en" ? "Config does not exist yet. Creating example..." : "Конфиг ещё не создан. Создаю пример...");
     saveConfig({ ...structuredClone(DEFAULT_CONFIG), sources: [{ name: "likes", url: "https://soundcloud.com/arx_1/likes", enabled: true }] });
   }
   if (!explicitUrl && process.stdin.isTTY && !hasFlag("--play")) {
@@ -2528,6 +2871,6 @@ async function main() {
 }
 
 main().catch((error) => {
-  console.error(`\nОшибка: ${error.message}`);
+  console.error(`\n${tt("settingsLanguage") === "Language" ? "Error" : "Ошибка"}: ${error.message}`);
   process.exitCode = 1;
 });

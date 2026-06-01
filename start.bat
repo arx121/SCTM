@@ -22,6 +22,7 @@ if errorlevel 8 (
 
 set "SRM_DATA_DIR=%DATA%"
 set "SRM_PORTABLE_ROOT=%ROOT%"
+set "SRM_AUTO_CLOSE=1"
 
 where wt.exe >nul 2>nul
 if %errorlevel%==0 (
@@ -29,5 +30,5 @@ if %errorlevel%==0 (
   exit /b 0
 )
 
-start "SoundCloud Random Music" powershell.exe -NoProfile -ExecutionPolicy Bypass -NoExit -File "%APP%\start.ps1"
+start "SoundCloud Random Music" powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%APP%\start.ps1"
 exit /b 0

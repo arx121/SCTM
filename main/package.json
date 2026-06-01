@@ -1,6 +1,6 @@
 {
   "name": "soundcloud-random-music-windows",
-  "version": "2.26.1-windows",
+  "version": "2.30.2-windows",
   "description": "SoundCloud Random Music for Windows PowerShell / Windows Terminal.",
   "type": "module",
   "bin": {
