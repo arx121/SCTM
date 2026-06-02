@@ -2,42 +2,14 @@
 A simple Windows terminal player that plays random tracks from SoundCloud likes and public playlists.
 Open the folder, run `start.bat`, add your sources, and listen.  
 No browser windows, no ads, no extra noise — just music.
-## Language
-- 🇬🇧 English: `README.md`
-- 🇷🇺 Russian: `README_RU.md`
 ## 🚀 Quick Start
 1. Download and extract the project archive.
 2. Open the folder:
-   ```txt
-   soundcloud-random-music-windows
-
 3. Run:
 
-start.bat
+start.bat - start.command
 
 On the first launch, the app will install the required project dependencies automatically.
-
-📦 Requirements
-
-Install these once:
-
-1. Node.js LTS
-
-Download Node.js LTS from:
-
-https://nodejs.org/
-
-2. mpv player
-
-Install mpv through Windows Terminal / PowerShell:
-
-winget install -e --id shinchiro.mpv
-
-3. yt-dlp
-
-The launcher can install it automatically, or you can install it manually:
-
-winget install -e --id yt-dlp.yt-dlp
 
 ⭐ Features
 
@@ -137,3 +109,5 @@ Then restart the app.
 This project is made for personal music playback from public SoundCloud pages.
 
 It is not an official SoundCloud client.
+
+WARNING: Primarily built with AI. Use at your own risk.
