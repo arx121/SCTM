@@ -33,6 +33,12 @@ Install mpv through Windows Terminal / PowerShell:
 
 winget install -e --id shinchiro.mpv
 
+3. yt-dlp
+
+The launcher can install it automatically, or you can install it manually:
+
+winget install -e --id yt-dlp.yt-dlp
+
 ⭐ Features
 
 * Random playback from SoundCloud likes and public playlists
