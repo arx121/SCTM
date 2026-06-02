@@ -43,5 +43,5 @@ Examples:
 While playing, bottom bar shows actions.
 Use ← → arrows + Enter.
 Available: Next · Back · Pause · Repeat · Volume · Menu
-💡 Pro tip.
+💡 Pro tip
 Switch to Smart mode — it’s the smartest and most reliable, but works a bit slower.
