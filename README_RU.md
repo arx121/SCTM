@@ -1,3 +1,4 @@
+**[🇬🇧 English](README.md)** | **[🇷🇺 Русский](README_RU.md)**
 # 🎵 SoundCloud Random Music
 
 **Уютный терминальный плеер, который просто кидает тебе рандомную музыку со SoundCloud.**
