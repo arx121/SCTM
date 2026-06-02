@@ -1,3 +1,4 @@
+**[🇬🇧 English](README.md)** | **[🇷🇺 Русский](README_RU.md)**
 # 🎵 SoundCloud Random Music
 
 **Cozy terminal player that just throws random music from SoundCloud at you.**
