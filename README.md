@@ -42,5 +42,5 @@ Examples:
 While playing, bottom bar shows actions.
 Use ← → arrows + Enter.
 Available: Next · Back · Pause · Repeat · Volume · Menu
-💡 Pro tip
-Switch to Smart mode — it’s the most reliable. A bit slower, but it tries everything until it finds a working stream.
+💡 Pro tip.
+Switch to Smart mode — it’s the smartest and most reliable, but works a bit slower.
