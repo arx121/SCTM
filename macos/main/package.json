@@ -1,0 +1,29 @@
+{
+  "name": "soundcloud-random-music-macos",
+  "version": "2.30.2-macos",
+  "description": "SoundCloud Random Music for macOS Terminal.",
+  "type": "module",
+  "bin": {
+    "srm": "./src/index.mjs",
+    "soundcloud-random-music": "./src/index.mjs"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "start": "node ./src/index.mjs",
+    "demo": "node ./src/index.mjs --demo",
+    "install-local": "npm install && npm link && srm --version"
+  },
+  "keywords": [
+    "soundcloud",
+    "random",
+    "music",
+    "terminal",
+    "cli"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "undici": "^6.21.1"
+  }
+}
