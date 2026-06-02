@@ -33,6 +33,12 @@ https://nodejs.org/
 
 winget install -e --id shinchiro.mpv
 
+### 3. Название папки в README лучше поменять
+
+У тебя репозиторий называется `SCTM`, а в README написано открыть папку:
+
+soundcloud-random-music-windows
+
 ⭐ Возможности
 
 * Случайное воспроизведение из SoundCloud-лайков и публичных плейлистов
