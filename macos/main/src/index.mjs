@@ -6,13 +6,71 @@ import { createInterface } from "node:readline/promises";
 import { emitKeypressEvents } from "node:readline";
 import { stdin as input, stdout as output } from "node:process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync, unlinkSync, copyFileSync } from "node:fs";
-import { homedir, tmpdir } from "node:os";
+import { homedir, tmpdir, networkInterfaces } from "node:os";
 import { dirname, join } from "node:path";
-import { createConnection } from "node:net";
+import { createConnection, createServer } from "node:net";
+import dgram from "node:dgram";
 
-const VERSION = "2.30.2-macos";
+const VERSION = "2.32.2-macos";
 const API_BASE = "https://api-v2.soundcloud.com";
 const LEGACY_CONFIG_DIR = join(homedir(), ".soundcloud-random-music");
+
+const ACTIVE_PLAYER_CHILDREN = new Set();
+let CLEANUP_HANDLERS_INSTALLED = false;
+
+function startWindowsParentWatchdog(childPid) {
+  if (process.platform !== "win32" || !childPid) return;
+  const parentPid = process.pid;
+  const script = `$parent=${parentPid}; $child=${childPid}; while (Get-Process -Id $parent -ErrorAction SilentlyContinue) { Start-Sleep -Milliseconds 500 }; try { taskkill /PID $child /T /F | Out-Null } catch {}`;
+  try {
+    const watcher = spawn("powershell.exe", ["-NoProfile", "-WindowStyle", "Hidden", "-Command", script], {
+      detached: true,
+      stdio: "ignore",
+      windowsHide: true
+    });
+    watcher.unref?.();
+  } catch {}
+}
+
+function registerPlayerChild(child) {
+  if (!child || !child.pid) return child;
+  ACTIVE_PLAYER_CHILDREN.add(child);
+  child.once?.("exit", () => ACTIVE_PLAYER_CHILDREN.delete(child));
+  child.once?.("error", () => ACTIVE_PLAYER_CHILDREN.delete(child));
+  startWindowsParentWatchdog(child.pid);
+  return child;
+}
+
+function cleanupPlayerChildrenSync() {
+  for (const child of [...ACTIVE_PLAYER_CHILDREN]) {
+    try { stopProcessTree(child); } catch {}
+  }
+}
+
+function installCleanupHandlers() {
+  if (CLEANUP_HANDLERS_INSTALLED) return;
+  CLEANUP_HANDLERS_INSTALLED = true;
+
+  const exitNow = (code = 0) => {
+    cleanupPlayerChildrenSync();
+    process.exit(code);
+  };
+
+  process.once("exit", cleanupPlayerChildrenSync);
+  process.once("SIGINT", () => exitNow(0));
+  process.once("SIGTERM", () => exitNow(0));
+  process.once("SIGHUP", () => exitNow(0));
+  process.once("uncaughtException", (error) => {
+    cleanupPlayerChildrenSync();
+    console.error(`\n${error?.stack || error?.message || error}`);
+    process.exit(1);
+  });
+  process.once("unhandledRejection", (error) => {
+    cleanupPlayerChildrenSync();
+    console.error(`\n${error?.stack || error?.message || error}`);
+    process.exit(1);
+  });
+}
 
 function detectDataDir() {
   const portableDir = process.env.SRM_DATA_DIR || process.env.SRM_PORTABLE_DATA_DIR;
@@ -63,10 +121,17 @@ const DEFAULT_CONFIG = {
     method: "smart",
     mode: "auto",
     tempDownloadFallback: false,
-    volume: 80
+    volume: 20
   },
   preload: {
     enabled: true
+  },
+  scan: {
+    enabled: true,
+    concurrency: 6,
+    maxTranscodings: 2,
+    timeoutMs: 2500,
+    schema: "quick-api-v1"
   },
   cache: {
     clientId: "",
@@ -78,7 +143,8 @@ const DEFAULT_CONFIG = {
 const DEFAULT_STATE = {
   blacklist: [],
   played: [],
-  history: []
+  history: [],
+  scan: {}
 };
 
 const DEMO_TRACKS = [
@@ -96,6 +162,10 @@ const I18N = {
     mainAdd: "Добавить источник",
     mainList: "Показать источники",
     mainStats: "Статистика",
+    mainScan: "Проверить треки",
+    mainHostRoom: "Создать комнату",
+    mainJoinRoom: "Войти в комнату",
+    mainCheckBlacklist: "Проверить blacklist",
     mainSettings: "Настройки",
     mainClearPlayed: "Очистить прослушанные",
     mainClearBlacklist: "Очистить чёрный список",
@@ -141,6 +211,25 @@ const I18N = {
     blacklist: "В чёрном списке",
     played: "Уже прослушано",
     available: "Доступно для рандома сейчас",
+    scanAlready: "Библиотека уже проверена, пропускаю проверку.",
+    scanStart: "Единоразовая проверка треков перед запуском. Нерабочие сразу уйдут в blacklist.",
+    scanProgress: "Проверка",
+    scanDone: "Проверка закончена",
+    scanGood: "рабочих",
+    scanBad: "в blacklist",
+    scanSkipped: "пропущено",
+    scanReturnMenu: "Проверка завершена. Возвращаюсь в меню — запусти рандом ещё раз, уже без мусорных треков.",
+    blacklistListEmpty: "Blacklist пустой.",
+    blacklistListTitle: "Треки в blacklist",
+    blacklistListReason: "причина",
+    blacklistListDate: "добавлен",
+    blacklistRecheckHint: "Для повторной проверки blacklist: srm --recheck-blacklist",
+    blacklistCheckEmpty: "Blacklist пустой — проверять нечего.",
+    blacklistCheckStart: "Проверяю blacklist. Рабочие треки вернутся в рандом.",
+    blacklistCheckProgress: "Проверка blacklist",
+    blacklistCheckDone: "Проверка blacklist закончена",
+    blacklistRestored: "возвращено",
+    blacklistKept: "оставлено",
     randomTrack: "Случайный трек",
     nextFromHistory: "Следующий из истории",
     previousAvailable: "Назад доступно",
@@ -197,6 +286,10 @@ const I18N = {
     mainAdd: "Add source",
     mainList: "Show sources",
     mainStats: "Statistics",
+    mainScan: "Scan tracks",
+    mainHostRoom: "Host listening room",
+    mainJoinRoom: "Join listening room",
+    mainCheckBlacklist: "Check blacklist",
     mainSettings: "Settings",
     mainClearPlayed: "Clear played tracks",
     mainClearBlacklist: "Clear blacklist",
@@ -242,6 +335,25 @@ const I18N = {
     blacklist: "In blacklist",
     played: "Already played",
     available: "Available for random now",
+    scanAlready: "Library was already scanned, skipping scan.",
+    scanStart: "One-time track scan before playback. Broken tracks will be added to blacklist.",
+    scanProgress: "Scanning",
+    scanDone: "Scan finished",
+    scanGood: "playable",
+    scanBad: "blacklisted",
+    scanSkipped: "skipped",
+    scanReturnMenu: "Scan finished. Returning to menu — start random again and bad tracks will be skipped.",
+    blacklistListEmpty: "Blacklist is empty.",
+    blacklistListTitle: "Tracks in blacklist",
+    blacklistListReason: "reason",
+    blacklistListDate: "added",
+    blacklistRecheckHint: "To recheck blacklist: srm --recheck-blacklist",
+    blacklistCheckEmpty: "Blacklist is empty — nothing to check.",
+    blacklistCheckStart: "Checking blacklist. Playable tracks will return to random.",
+    blacklistCheckProgress: "Checking blacklist",
+    blacklistCheckDone: "Blacklist check finished",
+    blacklistRestored: "restored",
+    blacklistKept: "kept",
     randomTrack: "Random track",
     nextFromHistory: "Next from history",
     previousAvailable: "Back available",
@@ -374,7 +486,7 @@ function parseArgs(args) {
     if (arg.startsWith("--")) {
       const [name, inlineValue] = arg.split("=", 2);
       flags.add(name);
-      const wantsValue = ["--player", "--add", "--remove", "--default", "--proxy", "--browser-player", "--backend", "--input", "--cookies-browser", "--method", "--playback", "--language", "--lang"].includes(name);
+      const wantsValue = ["--player", "--add", "--remove", "--default", "--proxy", "--browser-player", "--backend", "--input", "--cookies-browser", "--method", "--playback", "--language", "--lang", "--host", "--join", "--room", "--port"].includes(name);
       if (inlineValue !== undefined) {
         values.set(name, inlineValue);
       } else if (wantsValue && args[i + 1] && !args[i + 1].startsWith("--")) {
@@ -527,6 +639,8 @@ function loadConfig() {
       ui: { ...DEFAULT_CONFIG.ui, ...(loaded.ui || {}) },
       browserPlayer: { ...DEFAULT_CONFIG.browserPlayer, ...(loaded.browserPlayer || {}) },
       playback: { ...DEFAULT_CONFIG.playback, ...(loaded.playback || {}) },
+      preload: { ...DEFAULT_CONFIG.preload, ...(loaded.preload || {}) },
+      scan: { ...DEFAULT_CONFIG.scan, ...(loaded.scan || {}) },
       sources: Array.isArray(loaded.sources) ? loaded.sources : []
     };
     // Начиная с 2.11.0 браузер больше не используется как плеер.
@@ -569,7 +683,8 @@ function loadState() {
     return {
       blacklist: Array.isArray(loaded.blacklist) ? loaded.blacklist : [],
       played: Array.isArray(loaded.played) ? loaded.played : [],
-      history: Array.isArray(loaded.history) ? loaded.history : []
+      history: Array.isArray(loaded.history) ? loaded.history : [],
+      scan: loaded.scan && typeof loaded.scan === "object" ? loaded.scan : {}
     };
   } catch {
     return structuredClone(DEFAULT_STATE);
@@ -581,7 +696,8 @@ function saveState(state) {
   const clean = {
     blacklist: Array.isArray(state.blacklist) ? state.blacklist : [],
     played: Array.isArray(state.played) ? state.played : [],
-    history: Array.isArray(state.history) ? state.history.slice(-10000) : []
+    history: Array.isArray(state.history) ? state.history.slice(-10000) : [],
+    scan: state.scan && typeof state.scan === "object" ? state.scan : {}
   };
   writeFileSync(STATE_PATH, `${JSON.stringify(clean, null, 2)}\n`, "utf8");
 }
@@ -1390,7 +1506,7 @@ async function playStreamInteractive(playUrl, config, options = {}) {
     let lastCheckPrintedAt = 0;
     let pauseBusy = false;
     let repeatEnabled = Boolean(options.repeatEnabled);
-    let volume = clampNumber(options.volume ?? config.playback?.volume ?? 80, 0, 100, 80);
+    let volume = clampNumber(options.volume ?? config.playback?.volume ?? 20, 0, 100, 20);
     let volumeMode = false;
     let volumeBusy = false;
     const quietOutput = player.name === "mpv";
@@ -1416,10 +1532,10 @@ async function playStreamInteractive(playUrl, config, options = {}) {
       ? [...player.args, ...extraMpvArgs, `--input-ipc-server=${ipcPath}`, playUrl]
       : [...player.args, playUrl];
 
-    const child = spawn(player.command, args, {
+    const child = registerPlayerChild(spawn(player.command, args, {
       stdio: ["ignore", quietOutput ? "ignore" : "inherit", quietOutput ? "ignore" : "inherit"],
       windowsHide: true
-    });
+    }));
 
     const writeStatusLine = (text) => {
       // Keep the live status under one terminal line. Long lines wrap in macOS Terminal,
@@ -1520,6 +1636,9 @@ async function playStreamInteractive(playUrl, config, options = {}) {
           try { child.kill(paused ? "SIGSTOP" : "SIGCONT"); } catch {}
         }
         writeStatusLine(statusText());
+        if (typeof options.onControl === "function") {
+          try { options.onControl({ type: "pause", paused, position: lastTimePos, duration: lastDuration }); } catch {}
+        }
       } finally {
         pauseBusy = false;
       }
@@ -1630,6 +1749,9 @@ async function playStreamInteractive(playUrl, config, options = {}) {
           return;
         }
         writeStatusLine(statusText());
+        if (typeof options.onTick === "function") {
+          try { options.onTick({ position: lastTimePos, duration: lastDuration, paused }); } catch {}
+        }
         return;
       }
 
@@ -1654,6 +1776,9 @@ async function playStreamInteractive(playUrl, config, options = {}) {
       resolved = true;
       if (hasRealPlaybackSignal && typeof options.onFinished === "function") {
         try { options.onFinished({ durationSec: lastTimePos, totalDurationSec: lastDuration, action }); } catch {}
+      }
+      if (typeof options.onControl === "function") {
+        try { options.onControl({ type: "action", action, position: lastTimePos, duration: lastDuration, paused }); } catch {}
       }
       restoreTerminal();
       stopProcessTree(child);
@@ -1937,6 +2062,273 @@ function getActiveSources(config, explicitUrl = null) {
   return [selected];
 }
 
+function simpleHash(text) {
+  let hash = 5381;
+  for (let i = 0; i < text.length; i += 1) hash = ((hash << 5) + hash) ^ text.charCodeAt(i);
+  return (hash >>> 0).toString(16);
+}
+
+function libraryFingerprint(sources, tracks, config) {
+  const scanSchema = config.scan?.schema || "quick-api-v1";
+  const sourcePart = (sources || [])
+    .map((source) => `${source.name || ""}|${source.url || ""}|${source.enabled !== false ? "on" : "off"}`)
+    .sort()
+    .join("\n");
+  const trackPart = (tracks || [])
+    .map((track) => trackKey(track))
+    .filter(Boolean)
+    .sort()
+    .join("\n");
+  return simpleHash(`${scanSchema}\n${sourcePart}\n${trackPart}`);
+}
+
+async function validatePlaybackUrlForScan(streamUrl, config) {
+  const controller = new AbortController();
+  const timeoutMs = Math.max(1200, Number(config.scan?.timeoutMs || 2500));
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    const dispatcher = fetchDispatcher(config);
+    const response = await fetch(streamUrl, {
+      ...(dispatcher ? { dispatcher } : {}),
+      signal: controller.signal,
+      redirect: "follow",
+      headers: {
+        "user-agent": BROWSER_UA,
+        "accept": "audio/*,application/vnd.apple.mpegurl,application/x-mpegURL,*/*",
+        "referer": "https://soundcloud.com/",
+        "range": "bytes=0-1"
+      }
+    });
+    if (![200, 206].includes(response.status)) throw new Error(`stream HTTP ${response.status}`);
+    return true;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+async function quickValidateTrackForScan(track, clientId, config) {
+  const transcodings = chooseTranscodings(track).slice(0, Math.max(1, Number(config.scan?.maxTranscodings || 2)));
+  if (transcodings.length === 0) throw new Error("no stream/transcoding URL");
+  const errors = [];
+  for (const transcoding of transcodings) {
+    try {
+      const streamUrl = await getPlaybackUrlFromTranscoding(track, transcoding, clientId);
+      await validatePlaybackUrlForScan(streamUrl, config);
+      return true;
+    } catch (error) {
+      errors.push(`${transcodingLabel(transcoding)}: ${error?.message || error}`);
+    }
+  }
+  throw new Error(errors.at(-1) || "no playable stream");
+}
+
+function isTransientScanError(error) {
+  const message = String(error?.message || error || "").toLowerCase();
+  return message.includes("fetch failed")
+    || message.includes("abort")
+    || message.includes("timed out")
+    || message.includes("timeout")
+    || message.includes("enotfound")
+    || message.includes("econnreset")
+    || message.includes("etimedout")
+    || message.includes("network")
+    || message.includes("terminated");
+}
+
+async function scanTracksBeforePlayback({ tracks, sources, clientId, config, state, force = false }) {
+  if (config.scan?.enabled === false && !force) return { skipped: true, reason: "disabled" };
+
+  const fingerprint = libraryFingerprint(sources, tracks, config);
+  const previous = state.scan || {};
+  if (!force && previous.fingerprint === fingerprint && previous.schema === (config.scan?.schema || "quick-api-v1")) {
+    console.log(t(config, "scanAlready"));
+    return { skipped: true, reason: "already", fingerprint };
+  }
+
+  const blacklistKeys = stateKeys(state.blacklist);
+  const candidates = tracks.filter((track) => {
+    const key = trackKey(track);
+    return key && !blacklistKeys.has(key);
+  });
+
+  console.log(`\n${t(config, "scanStart")}`);
+  console.log(`${t(config, "scanProgress")}: 0/${candidates.length}`);
+
+  let cursor = 0;
+  let checked = 0;
+  let good = 0;
+  let bad = 0;
+  let skipped = 0;
+  const concurrency = Math.max(1, Math.min(12, Number(config.scan?.concurrency || 6)));
+
+  const updateProgress = () => {
+    const line = `${t(config, "scanProgress")}: ${checked}/${candidates.length} | ${t(config, "scanGood")}: ${good} | ${t(config, "scanBad")}: ${bad} | ${t(config, "scanSkipped")}: ${skipped}`;
+    if (process.stdout.isTTY) {
+      process.stdout.write(`\r${line.padEnd(Math.min(process.stdout.columns || 100, 120))}`);
+    } else if (checked % 25 === 0 || checked === candidates.length) {
+      console.log(line);
+    }
+  };
+
+  const worker = async () => {
+    while (cursor < candidates.length) {
+      const index = cursor;
+      cursor += 1;
+      const track = candidates[index];
+      try {
+        await quickValidateTrackForScan(track, clientId, config);
+        good += 1;
+      } catch (error) {
+        if (isTransientScanError(error)) {
+          skipped += 1;
+        } else {
+          bad += 1;
+          const key = trackKey(track);
+          if (key) blacklistKeys.add(key);
+          upsertStateEntry(state, "blacklist", stateEntry(track, {
+            reason: `preflight-scan: ${String(error?.message || error).split("\n")[0]}`,
+            scanSchema: config.scan?.schema || "quick-api-v1"
+          }));
+        }
+      } finally {
+        checked += 1;
+        updateProgress();
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, Math.max(1, candidates.length)) }, () => worker()));
+  if (process.stdout.isTTY) process.stdout.write("\n");
+
+  state.scan = {
+    schema: config.scan?.schema || "quick-api-v1",
+    fingerprint,
+    scannedAt: new Date().toISOString(),
+    total: tracks.length,
+    checked: candidates.length,
+    good,
+    bad,
+    skipped
+  };
+  saveState(state);
+
+  console.log(`${t(config, "scanDone")}: ${t(config, "scanGood")} ${good}, ${t(config, "scanBad")} ${bad}, ${t(config, "scanSkipped")} ${skipped + (tracks.length - candidates.length)}`);
+  return { skipped: false, fingerprint, checked: candidates.length, good, bad };
+}
+
+
+
+function printBlacklist() {
+  const config = loadConfig();
+  const state = loadState();
+  const blacklist = Array.isArray(state.blacklist) ? state.blacklist : [];
+
+  if (blacklist.length === 0) {
+    console.log(t(config, "blacklistListEmpty"));
+    return;
+  }
+
+  console.log(`${t(config, "blacklistListTitle")}: ${blacklist.length}`);
+  console.log("");
+
+  blacklist.forEach((entry, index) => {
+    const title = entry?.title || entry?.name || entry?.key || entry?.url || "Unknown track";
+    const url = entry?.url || entry?.key || "";
+    const reason = String(entry?.reason || entry?.lastCheckReason || "").split("\n")[0];
+    const addedAt = entry?.addedAt || entry?.lastCheckedAt || "";
+
+    console.log(`${index + 1}. ${title}`);
+    if (url && /^https?:\/\//i.test(url)) console.log(`   ${url}`);
+    if (reason) console.log(`   ${t(config, "blacklistListReason")}: ${reason}`);
+    if (addedAt) console.log(`   ${t(config, "blacklistListDate")}: ${addedAt}`);
+  });
+
+  console.log("");
+  console.log(t(config, "blacklistRecheckHint"));
+}
+
+async function runCheckBlacklist() {
+  const config = loadConfig();
+  const state = loadState();
+  const blacklist = Array.isArray(state.blacklist) ? state.blacklist : [];
+  if (blacklist.length === 0) {
+    console.log(t(config, "blacklistCheckEmpty"));
+    return { checked: 0, restored: 0, kept: 0, skipped: 0 };
+  }
+
+  console.log(`${t(config, "fileSettings")}: ${CONFIG_PATH}`);
+  console.log(t(config, "searchingClient"));
+  const clientId = await findWebClientId();
+
+  console.log(`\n${t(config, "blacklistCheckStart")}`);
+  console.log(`${t(config, "blacklistCheckProgress")}: 0/${blacklist.length}`);
+
+  let cursor = 0;
+  let checked = 0;
+  let restored = 0;
+  let kept = 0;
+  let skipped = 0;
+  const keep = [];
+  const concurrency = Math.max(1, Math.min(8, Number(config.scan?.concurrency || 6)));
+
+  const updateProgress = () => {
+    const line = `${t(config, "blacklistCheckProgress")}: ${checked}/${blacklist.length} | ${t(config, "blacklistRestored")}: ${restored} | ${t(config, "blacklistKept")}: ${kept} | ${t(config, "scanSkipped")}: ${skipped}`;
+    if (process.stdout.isTTY) {
+      process.stdout.write(`\r${line.padEnd(Math.min(process.stdout.columns || 100, 120))}`);
+    } else if (checked % 10 === 0 || checked === blacklist.length) {
+      console.log(line);
+    }
+  };
+
+  const worker = async () => {
+    while (cursor < blacklist.length) {
+      const index = cursor;
+      cursor += 1;
+      const entry = blacklist[index];
+      const url = entry?.url || entry?.key || "";
+      try {
+        if (!url || !/^https?:\/\//i.test(url)) throw new Error("no url");
+        const resolved = await resolveSoundCloudUrl(url, clientId);
+        const track = compactTrack(resolved) || resolved;
+        await quickValidateTrackForScan(track, clientId, config);
+        restored += 1;
+      } catch (error) {
+        const nextEntry = {
+          ...entry,
+          lastCheckedAt: new Date().toISOString(),
+          lastCheckReason: String(error?.message || error).split("\n")[0]
+        };
+        keep.push(nextEntry);
+        if (isTransientScanError(error)) skipped += 1;
+        else kept += 1;
+      } finally {
+        checked += 1;
+        updateProgress();
+      }
+    }
+  };
+
+  await Promise.all(Array.from({ length: Math.min(concurrency, blacklist.length) }, () => worker()));
+  if (process.stdout.isTTY) process.stdout.write("\n");
+
+  state.blacklist = keep;
+  saveState(state);
+  console.log(`${t(config, "blacklistCheckDone")}: ${t(config, "blacklistRestored")} ${restored}, ${t(config, "blacklistKept")} ${kept}, ${t(config, "scanSkipped")} ${skipped}`);
+  return { checked, restored, kept, skipped };
+}
+
+async function runScanOnly(explicitUrl = null) {
+  const config = loadConfig();
+  const sources = getActiveSources(config, explicitUrl);
+  if (sources.length === 0) throw new Error("No sources. Add one first.");
+  console.log(`${t(config, "fileSettings")}: ${CONFIG_PATH}`);
+  console.log(t(config, "searchingClient"));
+  const clientId = await findWebClientId();
+  const tracks = await loadTracksForSources(sources, clientId, config);
+  const state = loadState();
+  await scanTracksBeforePlayback({ tracks, sources, clientId, config, state, force: true });
+}
+
 async function runPlayer(explicitUrl = null) {
   const config = loadConfig();
   const sources = getActiveSources(config, explicitUrl);
@@ -1951,6 +2343,11 @@ async function runPlayer(explicitUrl = null) {
   if (tracks.length === 0) throw new Error("Не нашла доступные треки. Возможно, лайки/плейлист закрыты или сеть режет SoundCloud.");
 
   const state = loadState();
+  const scanResult = await scanTracksBeforePlayback({ tracks, sources, clientId, config, state, force: hasFlag("--rescan-tracks") });
+  if (!scanResult.skipped && !explicitUrl && !hasFlag("--play-after-scan")) {
+    console.log(t(config, "scanReturnMenu"));
+    return;
+  }
   const blacklistKeys = stateKeys(state.blacklist);
   const playedKeys = stateKeys(state.played);
   const available = tracks.filter((track) => {
@@ -1975,7 +2372,7 @@ async function runPlayer(explicitUrl = null) {
   let sessionPlayedCount = 0;
   let sessionSeconds = 0;
   let repeatEnabled = false;
-  let currentVolume = clampNumber(config.playback?.volume ?? 80, 0, 100, 80);
+  let currentVolume = clampNumber(config.playback?.volume ?? 20, 0, 100, 20);
   let shortPlaybackStreak = 0;
   const onVolumeChanged = (value) => {
     currentVolume = clampNumber(value, 0, 100, currentVolume);
@@ -2592,6 +2989,462 @@ async function handleInteractiveError(error) {
   await waitForEnter(t(config, "pressEnterMenu"));
 }
 
+
+// --- SRM shared listening room MVP (Radmin VPN / LAN) ---
+const ROOM_DEFAULT_PORT = 37821;
+const ROOM_DISCOVERY_PORT = 37822;
+
+function roomCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function localRoomIps() {
+  try {
+    const nets = Object.values(networkInterfaces() || {}).flat();
+    return nets
+      .filter((item) => item && item.family === "IPv4" && !item.internal)
+      .map((item) => item.address)
+      .filter(Boolean);
+  } catch {
+    return [];
+  }
+}
+
+
+function jsonLine(socket, data) {
+  try { socket.write(`${JSON.stringify(data)}\n`); } catch {}
+}
+
+function trackToRoomPayload(track, audioUrl, extra = {}) {
+  return {
+    type: "state",
+    title: displayTrack(track),
+    trackUrl: track.permalink_url,
+    audioUrl,
+    duration: Number(track.duration || 0) / 1000,
+    position: 0,
+    paused: false,
+    sentAt: Date.now(),
+    ...extra
+  };
+}
+
+function makeRoomBroadcaster(code, port) {
+  const udp = dgram.createSocket({ type: "udp4", reuseAddr: true });
+  let timer = null;
+  const payload = () => Buffer.from(JSON.stringify({ type: "srm-room", app: "SoundCloud Random Music", code, port, version: VERSION }));
+  const sendRoom = (address = "255.255.255.255", replyPort = ROOM_DISCOVERY_PORT) => {
+    try { udp.send(payload(), replyPort, address); } catch {}
+  };
+  udp.on("message", (message, rinfo) => {
+    try {
+      const data = JSON.parse(message.toString("utf8"));
+      if (data?.type === "srm-room-query" && String(data.code) === String(code)) {
+        sendRoom(rinfo.address, rinfo.port);
+      }
+    } catch {}
+  });
+  udp.on("error", () => {});
+  udp.bind(ROOM_DISCOVERY_PORT, () => {
+    try { udp.setBroadcast(true); } catch {}
+    timer = setInterval(() => sendRoom(), 1000);
+    timer.unref?.();
+  });
+  return () => {
+    if (timer) clearInterval(timer);
+    try { udp.close(); } catch {}
+  };
+}
+
+function createRoomServer(code, port = ROOM_DEFAULT_PORT) {
+  const clients = new Set();
+  let lastState = null;
+  const server = createServer((socket) => {
+    socket.setEncoding("utf8");
+    clients.add(socket);
+    jsonLine(socket, { type: "hello", code, version: VERSION, message: "connected" });
+    if (lastState) jsonLine(socket, lastState);
+    socket.on("close", () => clients.delete(socket));
+    socket.on("error", () => clients.delete(socket));
+  });
+  const listen = () => new Promise((resolve, reject) => {
+    server.once("error", reject);
+    server.listen(port, "0.0.0.0", () => {
+      server.off("error", reject);
+      resolve(server.address().port);
+    });
+  });
+  const broadcast = (message) => {
+    const msg = { ...message, code, sentAt: Date.now() };
+    if (msg.type === "state") lastState = msg;
+    for (const client of clients) jsonLine(client, msg);
+  };
+  const close = () => {
+    for (const client of clients) { try { client.destroy(); } catch {} }
+    try { server.close(); } catch {}
+  };
+  return { listen, broadcast, close, clients, server };
+}
+
+async function discoverRoom(code, timeoutMs = 7000) {
+  return new Promise((resolve) => {
+    const udp = dgram.createSocket({ type: "udp4", reuseAddr: true });
+    let done = false;
+    let queryTimer = null;
+    const queryPayload = () => Buffer.from(JSON.stringify({ type: "srm-room-query", app: "SoundCloud Random Music", code, version: VERSION }));
+    const finish = (value) => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      if (queryTimer) clearInterval(queryTimer);
+      try { udp.close(); } catch {}
+      resolve(value);
+    };
+    const sendQuery = () => {
+      try { udp.send(queryPayload(), ROOM_DISCOVERY_PORT, "255.255.255.255"); } catch {}
+    };
+    const timer = setTimeout(() => finish(null), timeoutMs);
+    udp.on("message", (message, rinfo) => {
+      try {
+        const data = JSON.parse(message.toString("utf8"));
+        if (data?.type === "srm-room" && String(data.code) === String(code)) {
+          finish({ host: rinfo.address, port: Number(data.port) || ROOM_DEFAULT_PORT, code });
+        }
+      } catch {}
+    });
+    udp.on("error", () => finish(null));
+    udp.bind(ROOM_DISCOVERY_PORT, () => {
+      try { udp.setBroadcast(true); } catch {}
+      sendQuery();
+      queryTimer = setInterval(sendQuery, 800);
+      queryTimer.unref?.();
+    });
+  });
+}
+
+async function askRoomEndpoint() {
+  const value = (await ask("Room code", "")).trim();
+  if (!value) return null;
+  if (/^\d{4,8}$/.test(value)) {
+    console.log(`Searching room by code ${value} in local network / Radmin VPN...`);
+    const found = await discoverRoom(value, 9000);
+    if (found) return found;
+    throw new Error("No connection to host. Make sure you are in the same local network/Radmin VPN, the host room is open, and the room code is correct.");
+  }
+  const [host, portRaw] = value.split(":");
+  return { host, port: Number(portRaw) || ROOM_DEFAULT_PORT, code: "manual" };
+}
+
+async function buildRoomPlayItem(track, config, clientId, quiet = false) {
+  const work = async () => ({ kind: "url", value: await resolveByMethod(track, config, clientId) });
+  if (!quiet) return await work();
+  const oldLog = console.log;
+  const oldWarn = console.warn;
+  const oldError = console.error;
+  console.log = () => {};
+  console.warn = () => {};
+  console.error = () => {};
+  try { return await work(); } finally { console.log = oldLog; console.warn = oldWarn; console.error = oldError; }
+}
+
+async function loadPlayableRoomTracks(config, clientId, explicitUrl = null) {
+  const sources = getActiveSources(config, explicitUrl);
+  if (sources.length === 0) throw new Error("No sources. Add one first.");
+  const tracks = await loadTracksForSources(sources, clientId, config);
+  const state = loadState();
+  await scanTracksBeforePlayback({ tracks, sources, clientId, config, state, force: hasFlag("--rescan-tracks") });
+  const blacklistKeys = stateKeys(state.blacklist);
+  return tracks.filter((track) => {
+    const key = trackKey(track);
+    return key && !blacklistKeys.has(key);
+  });
+}
+
+async function runHostRoom(explicitUrl = null) {
+  const config = loadConfig();
+  const code = roomCode();
+  const server = createRoomServer(code, Number(valueOf("--port")) || ROOM_DEFAULT_PORT);
+  const port = await server.listen();
+  const stopDiscovery = makeRoomBroadcaster(code, port);
+  console.clear?.();
+  console.log("SoundCloud Random Music — Listening Room Host");
+  console.log("==============================================");
+  console.log(`Room code: ${code}`);
+  console.log(`Port: ${port}`);
+  const ips = localRoomIps();
+  if (ips.length) console.log(`Host IPs: ${ips.join(", ")}`);
+  console.log("Friends can join by room code inside the same local network/Radmin VPN.");
+  console.log("No manual IP should be needed if discovery is allowed by firewall/network.");
+  console.log("");
+
+  let lastTickSent = 0;
+  const broadcast = (message) => server.broadcast(message);
+  const clientId = await findWebClientId();
+  const tracks = await loadPlayableRoomTracks(config, clientId, explicitUrl);
+  if (tracks.length === 0) throw new Error("No playable tracks for room.");
+
+  let previousTrack = null;
+  let currentTrack = null;
+  let nextTrack = null;
+  let keepGoing = true;
+  let repeatEnabled = false;
+  let currentVolume = clampNumber(config.playback?.volume ?? 20, 0, 100, 20);
+
+  const pick = (exclude = []) => {
+    const excluded = new Set(exclude.map((item) => item?.permalink_url).filter(Boolean));
+    const candidates = tracks.filter((track) => track?.permalink_url && !excluded.has(track.permalink_url));
+    return candidates[Math.floor(Math.random() * candidates.length)] || null;
+  };
+  const onVolumeChanged = (value) => {
+    currentVolume = clampNumber(value, 0, 100, currentVolume);
+    config.playback = { ...(config.playback || {}), volume: currentVolume };
+    try { saveConfig(config); } catch {}
+  };
+
+  try {
+    while (keepGoing) {
+      const track = currentTrack || nextTrack || pick([previousTrack]);
+      if (!track) break;
+      currentTrack = track;
+      if (!nextTrack || nextTrack.permalink_url === currentTrack.permalink_url) nextTrack = pick([previousTrack, currentTrack]);
+      console.log(`\nRoom track: ${displayTrack(track)}`);
+      console.log(track.permalink_url);
+      let playItem;
+      try {
+        playItem = await buildRoomPlayItem(track, config, clientId);
+      } catch (error) {
+        console.log(`Room skipped broken track: ${String(error.message || error).split("\n")[0]}`);
+        currentTrack = null;
+        continue;
+      }
+      const baseState = trackToRoomPayload(track, playItem.value, { paused: false, position: 0, duration: Number(track.duration || 0) / 1000 });
+      const action = await playStreamInteractive(playItem.value, config, {
+        title: displayTrack(track),
+        url: track.permalink_url,
+        durationSec: Number(track.duration || 0) / 1000,
+        repeatEnabled,
+        onRepeatChanged: (value) => { repeatEnabled = Boolean(value); broadcast({ type: "repeat", repeat: repeatEnabled }); },
+        volume: currentVolume,
+        onVolumeChanged,
+        softStartFallback: true,
+        onStarted: () => broadcast({ ...baseState, position: 0, paused: false, startedAt: Date.now() }),
+        onControl: (event) => {
+          if (event?.type === "pause") broadcast({ type: "control", control: "pause", paused: Boolean(event.paused), position: Number(event.position) || 0, duration: Number(event.duration) || 0 });
+          if (event?.type === "action") broadcast({ type: "control", control: event.action, position: Number(event.position) || 0, duration: Number(event.duration) || 0 });
+        },
+        onTick: (event) => {
+          const now = Date.now();
+          if (now - lastTickSent < 5000) return;
+          lastTickSent = now;
+          broadcast({ type: "sync", trackUrl: track.permalink_url, position: Number(event.position) || 0, duration: Number(event.duration) || 0, paused: Boolean(event.paused) });
+        }
+      });
+      if (action === "quit") { keepGoing = false; break; }
+      if (action === "previous" && previousTrack) {
+        nextTrack = currentTrack;
+        currentTrack = previousTrack;
+        previousTrack = null;
+        continue;
+      }
+      if (action === "repeat") {
+        currentTrack = track;
+        continue;
+      }
+      previousTrack = track;
+      currentTrack = nextTrack;
+      nextTrack = pick([previousTrack, currentTrack]);
+    }
+  } finally {
+    broadcast({ type: "room-closed" });
+    stopDiscovery();
+    server.close();
+  }
+}
+
+function createControlledMpv(config) {
+  let child = null;
+  let ipcPath = null;
+  const player = selectPlayer(config);
+  if (!player || player.name !== "mpv") throw new Error("Room mode requires mpv.");
+  const command = (payload, timeoutMs = 800) => new Promise((resolve) => {
+    if (!ipcPath) return resolve(null);
+    const socket = createConnection(ipcPath);
+    let buffer = "";
+    let done = false;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      socket.destroy();
+      resolve(null);
+    }, timeoutMs);
+    socket.on("connect", () => socket.write(`${JSON.stringify({ command: payload })}\n`));
+    socket.on("data", (chunk) => {
+      buffer += chunk.toString("utf8");
+      const line = buffer.split("\n").find(Boolean);
+      if (!line) return;
+      try {
+        const parsed = JSON.parse(line);
+        if (!done) {
+          done = true;
+          clearTimeout(timer);
+          socket.end();
+          resolve(parsed);
+        }
+      } catch {}
+    });
+    socket.on("error", () => {
+      if (done) return;
+      done = true;
+      clearTimeout(timer);
+      resolve(null);
+    });
+  });
+  const stop = () => {
+    if (child) stopProcessTree(child);
+    child = null;
+    ipcPath = null;
+  };
+  const start = (url, { title = "", position = 0, paused = false, volume = 20 } = {}) => {
+    stop();
+    ipcPath = process.platform === "win32"
+      ? `\\\\.\\pipe\\srm-room-${process.pid}-${Date.now()}`
+      : join(tmpdir(), `srm-room-${process.pid}-${Date.now()}.sock`);
+    const args = [...player.args, `--input-ipc-server=${ipcPath}`, `--volume=${clampNumber(volume, 0, 100, 20)}`, `--start=${Math.max(0, Number(position) || 0)}`, url];
+    child = registerPlayerChild(spawn(player.command, args, { stdio: ["ignore", "ignore", "ignore"], windowsHide: true }));
+    child.on("exit", () => {});
+    setTimeout(() => { if (paused) command(["set_property", "pause", true]); }, 1200).unref?.();
+    console.log(`\nRoom now playing: ${title}`);
+  };
+  return { start, stop, command };
+}
+
+async function runJoinRoom() {
+  const config = loadConfig();
+  const endpoint = valueOf("--join") ? await (async () => {
+    const raw = String(valueOf("--join"));
+    if (/^\d{4,8}$/.test(raw)) {
+      console.log(`Searching room by code ${raw} in local network / Radmin VPN...`);
+      return await discoverRoom(raw, 9000) || null;
+    }
+    const [host, portRaw] = raw.split(":");
+    return { host, port: Number(portRaw) || ROOM_DEFAULT_PORT, code: "manual" };
+  })() : await askRoomEndpoint();
+  if (!endpoint?.host) throw new Error("No connection to host. Make sure you are in the same local network/Radmin VPN, the host room is open, and the room code is correct.");
+  console.clear?.();
+  console.log("SoundCloud Random Music — Listening Room Guest");
+  console.log("===============================================");
+  console.log(`Connecting to ${endpoint.host}:${endpoint.port}...`);
+
+  const socket = createConnection(endpoint.port, endpoint.host);
+  socket.setEncoding("utf8");
+  socket.setTimeout(7000, () => {
+    console.log("\nNo connection to host. Check Radmin VPN/LAN, room code, firewall, and that host mode is still running.");
+    cleanup();
+  });
+  const player = createControlledMpv(config);
+  let currentTrackUrl = "";
+  let currentTitle = "";
+  let lastPosition = 0;
+  let paused = false;
+  let volume = clampNumber(config.playback?.volume ?? 20, 0, 100, 20);
+
+  const printLine = () => {
+    const text = `Room ${endpoint.code || "manual"} | ${paused ? "Paused" : "Playing"} ${formatTime(lastPosition)} | ${currentTitle || "waiting..."} | q = leave | +/- volume ${volume}%`;
+    const width = Math.max(40, Math.min(process.stdout.columns || 100, 120));
+    process.stdout.write(`\r\x1b[2K${text.length > width ? text.slice(0, width - 2) : text}`);
+  };
+
+  let tick = setInterval(async () => {
+    const answer = await player.command(["get_property", "time-pos"], 300);
+    const pos = Number(answer?.data);
+    if (Number.isFinite(pos)) lastPosition = pos;
+    printLine();
+  }, 1000);
+  tick.unref?.();
+
+  const handleState = async (data) => {
+    if (data.type === "room-closed") {
+      console.log("\nRoom closed by host.");
+      cleanup();
+      return;
+    }
+    if (data.type === "state") {
+      const playUrl = data.audioUrl || data.trackUrl;
+      const basePosition = Number(data.position) || 0;
+      const drift = data.paused ? 0 : Math.max(0, (Date.now() - Number(data.sentAt || Date.now())) / 1000);
+      const position = basePosition + drift;
+      currentTrackUrl = data.trackUrl || playUrl;
+      currentTitle = data.title || currentTrackUrl;
+      paused = Boolean(data.paused);
+      lastPosition = position;
+      player.start(playUrl, { title: currentTitle, position, paused, volume });
+      printLine();
+      return;
+    }
+    if (data.type === "control" && data.control === "pause") {
+      paused = Boolean(data.paused);
+      lastPosition = Number(data.position) || lastPosition;
+      await player.command(["set_property", "pause", paused], 800);
+      await player.command(["seek", lastPosition, "absolute"], 800);
+      printLine();
+      return;
+    }
+    if (data.type === "sync" && (!currentTrackUrl || data.trackUrl === currentTrackUrl)) {
+      const hostPos = Number(data.position) || 0;
+      if (Math.abs(hostPos - lastPosition) > 2.5) {
+        await player.command(["seek", hostPos, "absolute"], 800);
+        lastPosition = hostPos;
+      }
+      paused = Boolean(data.paused);
+      await player.command(["set_property", "pause", paused], 500);
+      printLine();
+    }
+  };
+
+  let buffer = "";
+  socket.on("data", (chunk) => {
+    buffer += chunk;
+    const lines = buffer.split("\n");
+    buffer = lines.pop() || "";
+    for (const line of lines) {
+      if (!line.trim()) continue;
+      try { handleState(JSON.parse(line)); } catch {}
+    }
+  });
+  socket.on("connect", () => { socket.setTimeout(0); console.log("Connected. Waiting for host track..."); });
+  socket.on("error", (error) => { console.log(`\nNo connection to host: ${error.message}. Check Radmin VPN/LAN, room code, firewall, and that host mode is still running.`); cleanup(); });
+  socket.on("close", () => { console.log("\nDisconnected from room."); cleanup(); });
+
+  const onKey = async (str = "", key = {}) => {
+    const text = String(str || key.sequence || key.name || "").toLowerCase();
+    if (key.sequence === "\u0003" || text === "q" || text === "й" || key.name === "escape") cleanup();
+    if (text === "+" || text === "=") { volume = clampNumber(volume + 5, 0, 100, volume); await player.command(["set_property", "volume", volume]); printLine(); }
+    if (text === "-" || text === "_") { volume = clampNumber(volume - 5, 0, 100, volume); await player.command(["set_property", "volume", volume]); printLine(); }
+  };
+
+  let cleaned = false;
+  function cleanup() {
+    if (cleaned) return;
+    cleaned = true;
+    clearInterval(tick);
+    try { player.stop(); } catch {}
+    try { socket.destroy(); } catch {}
+    try { if (process.stdin.isTTY) process.stdin.setRawMode(false); } catch {}
+    process.stdin.off("keypress", onKey);
+    process.stdin.pause();
+  }
+
+  emitKeypressEvents(process.stdin);
+  if (process.stdin.isTTY) process.stdin.setRawMode(true);
+  process.stdin.resume();
+  process.stdin.on("keypress", onKey);
+
+  await new Promise((resolve) => {
+    const check = setInterval(() => { if (cleaned) { clearInterval(check); resolve(); } }, 250);
+  });
+}
+
+
 async function interactiveMenu() {
   while (true) {
     const configForUi = loadConfig();
@@ -2600,6 +3453,10 @@ async function interactiveMenu() {
       { label: t(configForUi, "mainAdd"), value: "add" },
       { label: t(configForUi, "mainList"), value: "list" },
       { label: t(configForUi, "mainStats"), value: "stats" },
+      { label: t(configForUi, "mainScan"), value: "scan" },
+      { label: t(configForUi, "mainHostRoom"), value: "host-room" },
+      { label: t(configForUi, "mainJoinRoom"), value: "join-room" },
+      { label: t(configForUi, "mainCheckBlacklist"), value: "check-blacklist" },
       { label: t(configForUi, "mainSettings"), value: "settings" },
       { label: t(configForUi, "mainClearPlayed"), value: "clear-played" },
       { label: t(configForUi, "mainClearBlacklist"), value: "clear-blacklist" },
@@ -2645,6 +3502,32 @@ async function interactiveMenu() {
       printStats();
       await waitForEnter(t(loadConfig(), "pressEnterMenu"));
     }
+    if (choice === "scan") {
+      try {
+        await runScanOnly(null);
+      } catch (error) {
+        await handleInteractiveError(error);
+      }
+      await waitForEnter(t(loadConfig(), "pressEnterMenu"));
+    }
+    if (choice === "check-blacklist") {
+      printBlacklist();
+      await waitForEnter(t(loadConfig(), "pressEnterMenu"));
+    }
+    if (choice === "host-room") {
+      try {
+        await runHostRoom();
+      } catch (error) {
+        await handleInteractiveError(error);
+      }
+    }
+    if (choice === "join-room") {
+      try {
+        await runJoinRoom();
+      } catch (error) {
+        await handleInteractiveError(error);
+      }
+    }
     if (choice === "settings") {
       await settingsMenu();
     }
@@ -2658,6 +3541,7 @@ async function interactiveMenu() {
     if (choice === "clear-blacklist") {
       const state = loadState();
       state.blacklist = [];
+      state.scan = {};
       saveState(state);
       console.log(t(loadConfig(), "blacklistCleared"));
       await waitForEnter(t(loadConfig(), "pressEnterMenu"));
@@ -2705,8 +3589,13 @@ async function handleConfigCommands() {
   if (hasFlag("--show-config")) { console.log(JSON.stringify(config, null, 2)); return true; }
   if (hasFlag("--stats")) { printStats(); return true; }
   if (hasFlag("--show-state")) { console.log(JSON.stringify(loadState(), null, 2)); return true; }
+  if (hasFlag("--host") || hasFlag("--room")) { await runHostRoom(parsed.positional[0] || null); return true; }
+  if (hasFlag("--join")) { await runJoinRoom(); return true; }
+  if (hasFlag("--scan-tracks")) { await runScanOnly(parsed.positional[0] || null); return true; }
+  if (hasFlag("--check-blacklist")) { printBlacklist(); return true; }
+  if (hasFlag("--recheck-blacklist")) { await runCheckBlacklist(); return true; }
   if (hasFlag("--clear-played")) { const state = loadState(); state.played = []; saveState(state); console.log(t(config, "playedCleared")); return true; }
-  if (hasFlag("--clear-blacklist")) { const state = loadState(); state.blacklist = []; saveState(state); console.log(t(config, "blacklistCleared")); return true; }
+  if (hasFlag("--clear-blacklist")) { const state = loadState(); state.blacklist = []; state.scan = {}; saveState(state); console.log(t(config, "blacklistCleared")); return true; }
   if (hasFlag("--list")) {
     console.log(`config.json: ${CONFIG_PATH}`);
     console.log(`defaultSource: ${config.defaultSource}`);
@@ -2853,6 +3742,7 @@ async function handleConfigCommands() {
 }
 
 async function main() {
+  installCleanupHandlers();
   if (hasFlag("--help") || hasFlag("-h")) { showHelp(); return; }
   if (hasFlag("--version")) { console.log(VERSION); return; }
   if (hasFlag("--demo")) { await runDemo(); return; }

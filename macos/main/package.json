@@ -1,6 +1,6 @@
 {
   "name": "soundcloud-random-music-macos",
-  "version": "2.30.2-macos",
+  "version": "2.32.2",
   "description": "SoundCloud Random Music for macOS Terminal.",
   "type": "module",
   "bin": {

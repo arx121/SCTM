@@ -1,6 +1,12 @@
 ﻿# SoundCloud Random Music Windows launcher
 $ErrorActionPreference = "Stop"
 
+
+function Stop-SRM-Media {
+  try { taskkill /IM mpv.exe /F /T 2>$null | Out-Null } catch {}
+  try { taskkill /IM mpv.com /F /T 2>$null | Out-Null } catch {}
+}
+
 function Pause-And-Exit([int]$Code = 0) {
   if ($Code -eq 0) {
     exit 0
@@ -129,11 +135,13 @@ try {
   Write-Host ""
   & node .\src\index.mjs
   $exitCode = $LASTEXITCODE
+  Stop-SRM-Media
   if ($null -eq $exitCode) { $exitCode = 0 }
   Pause-And-Exit $exitCode
 } catch {
   Write-Host ""
   Write-Host "Ошибка запуска:" -ForegroundColor Red
   Write-Host $_.Exception.Message -ForegroundColor Red
+  Stop-SRM-Media
   Pause-And-Exit 1
 }
